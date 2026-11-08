@@ -258,4 +258,36 @@ class ServiceBookingManagementTest extends TestCase
         $this->assertSame('confirmed', $booking->status);
         $this->assertSame('Mohon datang tepat waktu.', $booking->admin_note);
     }
+
+    public function test_catatan_otomatis_dipasang_bila_admin_mengosongkan(): void
+    {
+        $booking = $this->makeBooking(['status' => 'pending']);
+
+        $this->changeStatus($booking, ['status' => 'confirmed', 'admin_note' => ''])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('confirmed', $booking->fresh()->status);
+        $this->assertSame(ServiceBooking::NOTE_TEMPLATES['confirmed'], $booking->fresh()->admin_note);
+    }
+
+    public function test_catatan_otomatis_dengan_tanda_alasan_wajib_dilengkapi(): void
+    {
+        $booking = $this->makeBooking(['status' => 'pending']);
+
+        $this->changeStatus($booking, ['status' => 'cancelled', 'admin_note' => ServiceBooking::NOTE_TEMPLATES['cancelled']])
+            ->assertSessionHasErrors(['admin_note' => 'Lengkapi catatan admin: ganti tanda … dengan alasan untuk customer.']);
+        $this->assertSame('pending', $booking->fresh()->status);
+
+        $this->changeStatus($booking, ['status' => 'cancelled', 'admin_note' => 'Mohon maaf, booking servis dibatalkan karena kuota teknisi penuh.'])
+            ->assertSessionHasNoErrors();
+        $this->assertSame('cancelled', $booking->fresh()->status);
+    }
+
+    public function test_form_status_membawa_catatan_otomatis(): void
+    {
+        $booking = $this->makeBooking(['status' => 'pending']);
+
+        $this->actingAs($this->admin)->get(route('admin.service-bookings.show', $booking))
+            ->assertSee('data-note-templates=\''.json_encode($booking->noteTemplates()).'\'', false);
+    }
 }

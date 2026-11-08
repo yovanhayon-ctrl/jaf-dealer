@@ -104,9 +104,8 @@
                             ->mapWithKeys(fn ($status) => [$status => \App\Models\ServiceBooking::STATUS_LABELS[$status]])
                             ->all(),
                         'adminNote' => $booking->admin_note,
-                        // Tidak datang: catatan untuk customer terisi otomatis.
-                        'noteTemplates' => [\App\Models\ServiceBooking::STATUS_NO_SHOW => $booking->noShowNote()],
-                        'noteHelp' => 'Wajib diisi saat membatalkan (alasan untuk customer). Bisa juga berisi hasil pekerjaan. Maksimal 1000 karakter.',
+                        'noteTemplates' => $booking->noteTemplates(),
+                        'noteHelp' => 'Wajib diisi saat membatalkan (alasan untuk customer). Catatan terisi otomatis saat status dipilih dan bisa diubah. Maksimal 1000 karakter.',
                     ])
                 </div>
             </div>

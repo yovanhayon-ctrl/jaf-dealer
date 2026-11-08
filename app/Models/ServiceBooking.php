@@ -62,6 +62,20 @@ class ServiceBooking extends Model
     /** Status yang wajib disertai catatan admin (alasan untuk customer). */
     public const NOTE_REQUIRED_STATUSES = [self::STATUS_CANCELLED];
 
+    /** Tanda bagian catatan yang wajib dilengkapi admin (alasan membatalkan). */
+    public const NOTE_PLACEHOLDER = '…';
+
+    /**
+     * Catatan admin otomatis saat status diubah (form admin mengisinya, admin boleh mengubah).
+     * Dibatalkan berisi tanda "…" yang wajib diganti alasan sebelum disimpan.
+     */
+    public const NOTE_TEMPLATES = [
+        self::STATUS_CONFIRMED => 'Booking servis Anda telah dikonfirmasi. Silakan datang ke bengkel tepat waktu sesuai jadwal.',
+        self::STATUS_IN_PROGRESS => 'Kendaraan Anda sedang dalam proses pengerjaan oleh tim mekanik kami.',
+        self::STATUS_COMPLETED => 'Pengerjaan servis telah selesai. Kendaraan Anda sudah siap untuk diambil di bengkel.',
+        self::STATUS_CANCELLED => 'Mohon maaf, booking servis dibatalkan karena '.self::NOTE_PLACEHOLDER,
+    ];
+
     /** Status yang masih memakai slot bengkel: dipakai cek kapasitas slot & booking ganda per plat. */
     public const ACTIVE_STATUSES = [self::STATUS_PENDING, self::STATUS_CONFIRMED, self::STATUS_IN_PROGRESS];
 
@@ -252,6 +266,19 @@ class ServiceBooking extends Model
     public function statusLabel(): string
     {
         return self::STATUS_LABELS[$this->status] ?? $this->status;
+    }
+
+    /**
+     * Catatan bawaan per status untuk form admin; status Tidak datang memakai noShowNote().
+     *
+     * @return array<string, string>
+     */
+    public function noteTemplates(): array
+    {
+        $templates = self::NOTE_TEMPLATES;
+        $templates[self::STATUS_NO_SHOW] = $this->noShowNote();
+
+        return $templates;
     }
 
     /**
