@@ -93,6 +93,28 @@ class StaffController extends Controller
             ->with('success', "Akun {$user->name} diperbarui".($user->is_active ? '.' : ' dan dinonaktifkan (tidak bisa login).'));
     }
 
+    public function destroy(Request $request, User $user): RedirectResponse
+    {
+        $this->ensureEditable($request, $user);
+
+        $name = $user->name;
+        $roleLabel = $user->roleLabel();
+        $role = $user->role;
+
+        $user->delete();
+
+        ActivityLog::record(
+            ActivityLog::CATEGORY_ACCOUNT,
+            'staff.deleted',
+            "Menghapus akun staf {$name} ({$roleLabel})",
+            null,
+            ['name' => $name, 'role' => $role]
+        );
+
+        return redirect()->route('admin.staff.index')
+            ->with('success', "Akun staf {$name} ({$roleLabel}) berhasil dihapus.");
+    }
+
     /**
      * Catat perubahan akun staf (role, aktif/nonaktif, data, kata sandi) di Riwayat Aktivitas; tanpa perubahan tidak dicatat.
      *

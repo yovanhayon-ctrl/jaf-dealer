@@ -92,12 +92,13 @@ class User extends Authenticatable
         'testimonials.view' => [self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE],
         'testimonials.moderate' => [self::ROLE_ADMIN],
         'users.view' => [self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE],
-        'staff-accounts.view' => [self::ROLE_OWNER, self::ROLE_ADMIN],
+        'staff-accounts.view' => [self::ROLE_ADMIN],
         'reports.view' => [self::ROLE_OWNER, self::ROLE_ADMIN],
         'reports.revenue' => [self::ROLE_OWNER],
-        'staff.manage' => [self::ROLE_OWNER, self::ROLE_ADMIN],
-        'activity.view' => [self::ROLE_OWNER, self::ROLE_ADMIN],
+        'staff.manage' => [self::ROLE_ADMIN],
+        'activity.view' => [self::ROLE_ADMIN],
         'reminders.send' => [self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE],
+        'notifications.view' => [self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE],
         'settings.manage' => [self::ROLE_OWNER],
         'backup.manage' => [self::ROLE_OWNER],
     ];
@@ -108,7 +109,7 @@ class User extends Authenticatable
      * @var array<string, list<string>>
      */
     public const MANAGEABLE_STAFF_ROLES = [
-        self::ROLE_OWNER => self::ASSIGNABLE_STAFF_ROLES,
+        self::ROLE_OWNER => [],
         self::ROLE_ADMIN => [self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE, self::ROLE_MECHANIC],
         self::ROLE_SUPER_ADMIN => [self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE, self::ROLE_MECHANIC],
     ];

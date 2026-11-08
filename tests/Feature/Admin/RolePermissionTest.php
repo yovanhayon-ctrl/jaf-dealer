@@ -60,7 +60,7 @@ class RolePermissionTest extends TestCase
 
         return [
             'dashboard' => ['admin.dashboard', $panel],
-            'notifikasi' => ['admin.notifications.index', $panel],
+            'notifikasi' => ['admin.notifications.index', ['admin', 'sales', 'customer_service']],
             'mobil' => ['admin.cars.index', ['admin', 'sales', 'customer_service']],
             'tambah mobil' => ['admin.cars.create', ['admin']],
             'merek' => ['admin.brands.index', ['admin']],
@@ -74,7 +74,7 @@ class RolePermissionTest extends TestCase
             'ulasan' => ['admin.testimonials.index', ['admin', 'customer_service']],
             'pengguna' => ['admin.users.index', ['admin', 'customer_service']],
             'laporan' => ['admin.reports.index', ['owner', 'admin']],
-            'staf' => ['admin.staff.index', ['owner', 'admin']],
+            'staf' => ['admin.staff.index', ['admin']],
             'pengaturan' => ['admin.settings.edit', ['owner']],
             'pekerjaan mekanik' => ['mechanic.jobs.index', ['mechanic']],
             'layanan mekanik' => ['mechanic.services.index', ['mechanic']],
@@ -94,17 +94,17 @@ class RolePermissionTest extends TestCase
         }
     }
 
-    public function test_owner_hanya_mengakses_dashboard_laporan_staf_pengaturan(): void
+    public function test_owner_hanya_mengakses_dashboard_laporan_pengaturan(): void
     {
         $owner = $this->users['owner'];
 
         $this->actingAs($owner)->get(route('admin.dashboard'))->assertOk();
-        $this->get(route('admin.notifications.index'))->assertOk();
         $this->get(route('admin.reports.index'))->assertOk();
-        $this->get(route('admin.staff.index'))->assertOk();
         $this->get(route('admin.settings.edit'))->assertOk();
 
-        // Operasional ditolak (403)
+        // Notifikasi, staf, dan operasional ditolak (403)
+        $this->get(route('admin.notifications.index'))->assertForbidden();
+        $this->get(route('admin.staff.index'))->assertForbidden();
         $this->get(route('admin.cars.index'))->assertForbidden();
         $this->get(route('admin.brands.index'))->assertForbidden();
         $this->get(route('admin.categories.index'))->assertForbidden();
@@ -119,13 +119,13 @@ class RolePermissionTest extends TestCase
 
     public function test_sidebar_mengikuti_hak_akses(): void
     {
-        // Owner hanya melihat Dashboard, Notifikasi, Laporan, Staf, Pengaturan
+        // Owner hanya melihat Dashboard, Laporan, Pengaturan (tanpa Notifikasi dan Staf)
         $this->actingAs($this->users['owner'])->get(route('admin.dashboard'))
             ->assertSee('href="'.route('admin.dashboard').'"', false)
-            ->assertSee('href="'.route('admin.notifications.index').'"', false)
             ->assertSee('href="'.route('admin.reports.index').'"', false)
-            ->assertSee('href="'.route('admin.staff.index').'"', false)
             ->assertSee('href="'.route('admin.settings.edit').'"', false)
+            ->assertDontSee('href="'.route('admin.notifications.index').'"', false)
+            ->assertDontSee('href="'.route('admin.staff.index').'"', false)
             ->assertDontSee('href="'.route('admin.cars.index').'"', false)
             ->assertDontSee('href="'.route('admin.brands.index').'"', false)
             ->assertDontSee('href="'.route('admin.categories.index').'"', false)
@@ -396,13 +396,22 @@ class RolePermissionTest extends TestCase
         ])->assertRedirect(route('admin.staff.index'));
         $this->assertDatabaseHas('users', ['email' => 'sinta@dealer.test', 'role' => 'sales']);
 
-        // Owner boleh mengelola akun Admin & staf lain
-        $this->actingAs($owner)->get(route('admin.staff.edit', $admin))->assertOk();
-        $this->actingAs($owner)->post(route('admin.staff.store'), [
-            'name' => 'Admin Baru', 'email' => 'adminbaru@dealer.test', 'role' => 'admin',
-            'password' => 'rahasia123', 'password_confirmation' => 'rahasia123',
-        ])->assertRedirect(route('admin.staff.index'));
-        $this->assertDatabaseHas('users', ['email' => 'adminbaru@dealer.test', 'role' => 'admin']);
+        // Admin bisa menghapus staf lain (misal sales)
+        $this->actingAs($admin)->delete(route('admin.staff.destroy', $this->users['sales']))
+            ->assertRedirect(route('admin.staff.index'))
+            ->assertSessionHas('success');
+        $this->assertModelMissing($this->users['sales']);
+
+        // Admin TIDAK BISA menghapus Owner (404)
+        $this->actingAs($admin)->delete(route('admin.staff.destroy', $owner))->assertNotFound();
+        $this->assertModelExists($owner);
+
+        // Admin TIDAK BISA menghapus akun sendiri (404)
+        $this->actingAs($admin)->delete(route('admin.staff.destroy', $admin))->assertNotFound();
+        $this->assertModelExists($admin);
+
+        // Owner tidak bisa membuka menu staf (403)
+        $this->actingAs($owner)->get(route('admin.staff.index'))->assertForbidden();
     }
 
     public function test_notifikasi_admin_hanya_ke_role_yang_berhak(): void

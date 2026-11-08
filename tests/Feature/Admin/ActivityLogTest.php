@@ -21,12 +21,15 @@ class ActivityLogTest extends TestCase
 
     private User $owner;
 
+    private User $admin;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->travelTo(Carbon::parse('2026-10-21 09:30:00', 'Asia/Jakarta'));
         $this->owner = User::factory()->owner()->create(['name' => 'Fadlan']);
+        $this->admin = User::factory()->admin()->create(['name' => 'Admin Utama']);
     }
 
     private function makeApprovedPurchase(): PurchaseRequest
@@ -48,7 +51,7 @@ class ActivityLogTest extends TestCase
 
     public function test_akun_staf_dan_login_staf_tercatat(): void
     {
-        $this->actingAs($this->owner)->post(route('admin.staff.store'), [
+        $this->actingAs($this->admin)->post(route('admin.staff.store'), [
             'name' => 'Rina Kartika', 'email' => 'rina@jaf.test', 'phone' => '081255501234', 'role' => 'sales',
             'password' => 'RahasiaBaru123', 'password_confirmation' => 'RahasiaBaru123',
         ])->assertSessionHasNoErrors();
@@ -71,7 +74,7 @@ class ActivityLogTest extends TestCase
 
         $log = ActivityLog::query()->where('action', 'staff.updated')->orderBy('id')->first();
         $this->assertSame(ActivityLog::CATEGORY_ACCOUNT, $log->category);
-        $this->assertSame($this->owner->id, $log->user_id);
+        $this->assertSame($this->admin->id, $log->user_id);
         $this->assertEquals(['old' => 'sales', 'new' => 'admin'], $log->properties['role']);
         $this->assertSame('reset', $log->properties['password']);
         $this->assertSame('127.0.0.1', $log->ip_address);
@@ -145,15 +148,15 @@ class ActivityLogTest extends TestCase
         $this->assertSame($unused->id, $log->subject_id);
     }
 
-    public function test_halaman_riwayat_hanya_owner_dan_super_admin(): void
+    public function test_halaman_riwayat_hanya_admin(): void
     {
         $purchase = $this->makeApprovedPurchase();
         $sales = User::factory()->sales()->create(['name' => 'Yoseph']);
         ActivityLog::record(ActivityLog::CATEGORY_PURCHASE, 'purchase.status', 'Mengubah status pengajuan contoh', $purchase, user: $sales);
         $this->travel(1)->hours();
-        ActivityLog::record(ActivityLog::CATEGORY_LOGIN, 'auth.login', 'Masuk', user: $this->owner);
+        ActivityLog::record(ActivityLog::CATEGORY_LOGIN, 'auth.login', 'Masuk', user: $this->admin);
 
-        $this->actingAs($this->owner)->get(route('admin.staff.index'))->assertSee(route('admin.staff.activity'), false);
+        $this->actingAs($this->admin)->get(route('admin.staff.index'))->assertSee(route('admin.staff.activity'), false);
         $this->get(route('admin.staff.activity'))
             ->assertOk()
             ->assertSee('2 aktivitas')
@@ -171,7 +174,9 @@ class ActivityLogTest extends TestCase
         $sales->delete();
         $this->get(route('admin.staff.activity'))->assertSee('Yoseph');
 
-        $this->actingAs(User::factory()->admin()->create())->get(route('admin.staff.activity'))->assertOk();
+        // Owner tidak mengakses menu staf maupun riwayat aktivitas staf
+        $this->actingAs($this->owner)->get(route('admin.staff.activity'))->assertForbidden();
+
         foreach (['sales', 'customerService', 'mechanic'] as $role) {
             $this->actingAs(User::factory()->{$role}()->create())->get(route('admin.staff.activity'))->assertForbidden();
         }

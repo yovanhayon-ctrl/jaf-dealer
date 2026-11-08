@@ -25,7 +25,7 @@
                     <h1 class="h5 mb-0 text-truncate">@yield('title', $panelUser->isAdmin() ? 'Admin' : 'Pekerjaan Saya')</h1>
 
                     <div class="d-flex align-items-center gap-2 gap-sm-3 ms-auto">
-                        @if (Route::has($notificationRoute.'.index'))
+                        @if (Route::has($notificationRoute.'.index') && ($panelUser->isMechanic() || $panelUser->hasPermission('notifications.view')))
                             <a href="{{ route($notificationRoute.'.index') }}"
                                @class(['btn btn-sm btn-outline-secondary notification-bell', 'active' => request()->routeIs($notificationRoute.'.*')])
                                aria-label="Notifikasi{{ $adminUnreadNotifications ? ", {$adminUnreadNotifications} belum dibaca" : '' }}">

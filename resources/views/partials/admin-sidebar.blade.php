@@ -11,7 +11,7 @@
     ];
     $menu = [
         ['label' => 'Dashboard', 'icon' => 'bi-speedometer2', 'route' => 'admin.dashboard', 'active' => 'admin.dashboard'],
-        ['label' => 'Notifikasi', 'icon' => 'bi-bell', 'route' => 'admin.notifications.index', 'active' => 'admin.notifications.*', 'badge' => $adminUnreadNotifications ?? 0],
+        ['label' => 'Notifikasi', 'icon' => 'bi-bell', 'route' => 'admin.notifications.index', 'active' => 'admin.notifications.*', 'can' => 'notifications.view', 'badge' => $adminUnreadNotifications ?? 0],
         ['label' => 'Mobil', 'icon' => 'bi-car-front', 'route' => 'admin.cars.index', 'active' => 'admin.cars.*', 'can' => 'cars.view'],
         ['label' => 'Merek', 'icon' => 'bi-tags', 'route' => 'admin.brands.index', 'active' => 'admin.brands.*', 'can' => 'brands.view'],
         ['label' => 'Kategori', 'icon' => 'bi-grid', 'route' => 'admin.categories.index', 'active' => 'admin.categories.*', 'can' => 'categories.view'],

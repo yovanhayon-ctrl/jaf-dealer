@@ -1383,6 +1383,7 @@ img.promo-card-img {
 
 .stat-card {
     color: inherit;
+    min-height: 86px;
 }
 
 .stat-card-icon {
@@ -1404,10 +1405,22 @@ img.promo-card-img {
 .stat-card-icon-dark   { background-color: rgba(52, 58, 64, .12);  color: #343a40; }
 
 .stat-card-value {
-    font-size: 1.6rem;
+    font-size: 1.5rem;
     font-weight: 700;
-    line-height: 1.1;
+    line-height: 1.15;
     color: var(--dm-ink);
+    white-space: nowrap;
+}
+
+.stat-card-value-sm {
+    font-size: 1.2rem;
+    letter-spacing: -0.01em;
+}
+
+@media (max-width: 1400px) {
+    .stat-card-value-sm {
+        font-size: 1.05rem;
+    }
 }
 
 /* ---------- Komponen: status-badge (RANCANGAN §2) ---------- */

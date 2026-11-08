@@ -196,8 +196,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/pengingat', ReminderController::class)->middleware(['can:reminders.send', 'throttle:6,1'])->name('reminders.send');
 
     Route::controller(AdminNotificationController::class)->prefix('notifikasi')->name('notifications.')->group(function () {
-        Route::get('/', 'index')->name('index');
-        Route::patch('baca-semua', 'markAllAsRead')->name('read-all');
+        Route::get('/', 'index')->middleware('can:notifications.view')->name('index');
+        Route::patch('baca-semua', 'markAllAsRead')->middleware('can:notifications.view')->name('read-all');
         Route::get('{notification}', 'open')->whereUuid('notification')->name('open');
     });
 
@@ -328,7 +328,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     // Kelola akun staf: owner (semua) & super admin (kecuali Owner/Super Admin), lihat User::MANAGEABLE_STAFF_ROLES.
     Route::resource('staf', StaffController::class)
-        ->only(['index', 'create', 'store', 'edit', 'update'])
+        ->only(['index', 'create', 'store', 'edit', 'update', 'destroy'])
         ->parameters(['staf' => 'user'])
         ->names('staff')
         ->middleware('can:staff.manage');

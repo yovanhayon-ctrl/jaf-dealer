@@ -89,7 +89,11 @@
         </span>
     </div>
 
-    <div class="row row-cols-1 row-cols-sm-2 row-cols-xl-4 g-3 mb-4">
+    <div @class([
+        'row g-3 mb-4',
+        'row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-xl-5' => auth()->user()->can('reports.revenue'),
+        'row-cols-1 row-cols-sm-2 row-cols-xl-4' => ! auth()->user()->can('reports.revenue'),
+    ])>
         <div class="col"><x-stat-card label="Total Pengajuan" :value="$purchases['total']" icon="bi-file-earmark-text" color="navy" /></div>
         <div class="col"><x-stat-card label="Unit Terjual" :value="$purchases['units_sold']" icon="bi-bag-check" color="green" /></div>
         @can('reports.revenue')
