@@ -71,6 +71,8 @@ class RolePermissionTest extends TestCase
             'pengajuan' => ['admin.purchase-requests.index', ['admin', 'sales', 'customer_service']],
             'booking servis' => ['admin.service-bookings.index', ['admin', 'customer_service']],
             'layanan servis' => ['admin.services.index', ['admin', 'customer_service']],
+            'spare part' => ['admin.spare-parts.index', ['admin']],
+            'tambah spare part' => ['admin.spare-parts.create', ['admin']],
             'ulasan' => ['admin.testimonials.index', ['admin', 'customer_service']],
             'pengguna' => ['admin.users.index', ['admin', 'customer_service']],
             'laporan' => ['admin.reports.index', ['owner', 'admin']],
@@ -147,6 +149,7 @@ class RolePermissionTest extends TestCase
             ->assertSee('href="'.route('admin.purchase-requests.index').'"', false)
             ->assertSee('href="'.route('admin.service-bookings.index').'"', false)
             ->assertSee('href="'.route('admin.services.index').'"', false)
+            ->assertSee('href="'.route('admin.spare-parts.index').'"', false)
             ->assertSee('href="'.route('admin.testimonials.index').'"', false)
             ->assertSee('href="'.route('admin.users.index').'"', false)
             ->assertSee('href="'.route('admin.reports.index').'"', false)
@@ -159,6 +162,7 @@ class RolePermissionTest extends TestCase
             ->assertSee('href="'.route('admin.test-drives.index').'"', false)
             ->assertSee('href="'.route('admin.purchase-requests.index').'"', false)
             ->assertDontSee('href="'.route('admin.service-bookings.index').'"', false)
+            ->assertDontSee('href="'.route('admin.spare-parts.index').'"', false)
             ->assertDontSee('href="'.route('admin.users.index').'"', false)
             ->assertDontSee('href="'.route('admin.reports.index').'"', false)
             ->assertDontSee('href="'.route('admin.staff.index').'"', false)
@@ -171,6 +175,7 @@ class RolePermissionTest extends TestCase
             ->assertSee('href="'.route('admin.promos.index').'"', false)
             ->assertSee('href="'.route('admin.test-drives.index').'"', false)
             ->assertSee('href="'.route('admin.users.index').'"', false)
+            ->assertDontSee('href="'.route('admin.spare-parts.index').'"', false)
             ->assertDontSee('href="'.route('admin.staff.index').'"', false)
             ->assertDontSee('href="'.route('admin.reports.index').'"', false)
             ->assertDontSee('href="'.route('admin.settings.edit').'"', false);

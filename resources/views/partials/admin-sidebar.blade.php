@@ -20,6 +20,7 @@
         ['label' => 'Pengajuan', 'icon' => 'bi-file-earmark-text', 'route' => 'admin.purchase-requests.index', 'active' => 'admin.purchase-requests.*', 'can' => 'purchases.view'],
         ['label' => 'Booking Servis', 'icon' => 'bi-wrench-adjustable', 'route' => 'admin.service-bookings.index', 'active' => 'admin.service-bookings.*', 'can' => 'service-bookings.view'],
         ['label' => 'Layanan Servis', 'icon' => 'bi-tools', 'route' => 'admin.services.index', 'active' => 'admin.services.*', 'can' => 'services.view'],
+        ['label' => 'Spare Part', 'icon' => 'bi-box-seam', 'route' => 'admin.spare-parts.index', 'active' => 'admin.spare-parts.*', 'can' => 'spare-parts.view'],
         ['label' => 'Ulasan', 'icon' => 'bi-star', 'route' => 'admin.testimonials.index', 'active' => 'admin.testimonials.*', 'can' => 'testimonials.view'],
         ['label' => 'Pengguna', 'icon' => 'bi-people', 'route' => 'admin.users.index', 'active' => 'admin.users.*', 'can' => 'users.view'],
         ['label' => 'Laporan', 'icon' => 'bi-bar-chart', 'route' => 'admin.reports.index', 'active' => 'admin.reports.*', 'can' => 'reports.view'],

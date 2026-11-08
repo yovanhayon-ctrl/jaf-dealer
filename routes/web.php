@@ -25,6 +25,7 @@ use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\ServiceBookingController as AdminServiceBookingController;
 use App\Http\Controllers\Admin\ServiceController as AdminServiceController;
 use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Admin\SparePartController as AdminSparePartController;
 use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\Admin\TestDriveController as AdminTestDriveController;
 use App\Http\Controllers\Admin\TestimonialController as AdminTestimonialController;
@@ -291,6 +292,18 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         ->middleware('can:services.view')
         ->middlewareFor(['create', 'store', 'edit', 'update'], 'can:services.manage')
         ->middlewareFor('destroy', 'can:master.delete');
+
+    // Master suku cadang (Spare Part)
+    Route::patch('spare-part/{sparePart}/status', [AdminSparePartController::class, 'toggleActive'])
+        ->middleware('can:spare-parts.manage')
+        ->name('spare-parts.toggle-active');
+
+    Route::resource('spare-part', AdminSparePartController::class)
+        ->except('show')
+        ->parameters(['spare-part' => 'sparePart'])
+        ->names('spare-parts')
+        ->middleware('can:spare-parts.view')
+        ->middlewareFor(['create', 'store', 'edit', 'update', 'destroy'], 'can:spare-parts.manage');
 
     Route::controller(AdminServiceBookingController::class)->prefix('servis')->name('service-bookings.')->middleware('can:service-bookings.view')->group(function () {
         Route::get('/', 'index')->name('index');

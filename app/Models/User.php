@@ -89,6 +89,8 @@ class User extends Authenticatable
         'service-bookings.manage' => [self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE],
         'services.view' => [self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE, self::ROLE_MECHANIC],
         'services.manage' => [self::ROLE_ADMIN],
+        'spare-parts.view' => [self::ROLE_ADMIN],
+        'spare-parts.manage' => [self::ROLE_ADMIN],
         'testimonials.view' => [self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE],
         'testimonials.moderate' => [self::ROLE_ADMIN],
         'users.view' => [self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE],
