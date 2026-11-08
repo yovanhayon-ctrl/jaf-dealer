@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'user_id', 'car_id', 'preferred_date', 'preferred_time', 'phone', 'notes',
+    'user_id', 'car_id', 'sales_id', 'preferred_date', 'preferred_time', 'phone', 'notes',
     'status', 'admin_note',
 ])]
 class TestDrive extends Model
@@ -92,6 +92,16 @@ class TestDrive extends Model
     public function car(): BelongsTo
     {
         return $this->belongsTo(Car::class);
+    }
+
+    public function sales(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'sales_id');
+    }
+
+    public function isAssignedTo(?User $user): bool
+    {
+        return $user !== null && $this->sales_id === $user->id;
     }
 
     public function isPending(): bool

@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\PurchaseRequestStatusRequest;
 use App\Models\ActivityLog;
 use App\Models\PurchaseRequest;
+use App\Models\User;
 use App\Notifications\Notifier;
 use App\Notifications\PurchaseRequestStatusChanged;
 use App\Support\PurchaseRequestPdf;
@@ -15,6 +16,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 /**
@@ -47,12 +49,19 @@ class PurchaseRequestController extends Controller
     {
         $filters = $this->filters($request);
 
-        $purchaseRequests = PurchaseRequest::query()
+        $query = PurchaseRequest::query()
             ->with([
                 'user:id,name,email', 'car:id,brand_id,name,year', 'car.brand:id,name',
                 'paymentProofs:id,purchase_request_id,amount,status,created_at',
                 'paymentRefunds:id,purchase_request_id,amount',
-            ])
+                'sales:id,name',
+            ]);
+
+        if ($request->user()->isSales()) {
+            $query->where('sales_id', $request->user()->id);
+        }
+
+        $purchaseRequests = $query
             ->tap(fn (Builder $query) => $this->applyFilters($query, $filters))
             ->orderBy('created_at', self::SORTS[$filters['urut']])
             ->orderBy('id', self::SORTS[$filters['urut']])
@@ -66,24 +75,36 @@ class PurchaseRequestController extends Controller
         ]);
     }
 
-    public function show(PurchaseRequest $purchaseRequest): View
+    public function show(Request $request, PurchaseRequest $purchaseRequest): View
     {
+        if ($request->user()->isSales()) {
+            abort_unless($purchaseRequest->isAssignedTo($request->user()), 404);
+        }
+
         $purchaseRequest->load([
             'user:id,name,email,phone',
             'car:id,brand_id,name,slug,year,vehicle_condition,price,stock,is_active',
             'car.brand:id,name',
+            'sales:id,name',
             'paymentProofs.recorder:id,name',
             'paymentRefunds.recorder:id,name',
         ]);
 
-        return view('admin.purchase-requests.show', ['purchaseRequest' => $purchaseRequest]);
+        return view('admin.purchase-requests.show', [
+            'purchaseRequest' => $purchaseRequest,
+            'salesStaff' => User::activeSales()->pluck('name', 'id')->all(),
+        ]);
     }
 
     /**
      * Bukti pengajuan (PDF), sama dengan yang diunduh customer.
      */
-    public function pdf(PurchaseRequest $purchaseRequest, PurchaseRequestPdf $pdf): Response
+    public function pdf(Request $request, PurchaseRequest $purchaseRequest, PurchaseRequestPdf $pdf): Response
     {
+        if ($request->user()->isSales()) {
+            abort_unless($purchaseRequest->isAssignedTo($request->user()), 404);
+        }
+
         return $pdf->response($purchaseRequest);
     }
 
@@ -92,6 +113,10 @@ class PurchaseRequestController extends Controller
         PurchaseRequest $purchaseRequest,
         ChangePurchaseRequestStatus $changeStatus,
     ): RedirectResponse {
+        if ($request->user()->isSales()) {
+            abort_unless($purchaseRequest->isAssignedTo($request->user()), 404);
+        }
+
         $oldLabel = $purchaseRequest->statusLabel();
         $oldStatus = $purchaseRequest->status;
         $status = $request->validated('status');
@@ -123,6 +148,24 @@ class PurchaseRequestController extends Controller
             $updated, ['old' => $oldStatus, 'new' => $updated->status]);
 
         return $redirect->with('success', "Status pengajuan diubah dari {$oldLabel} menjadi {$updated->statusLabel()}.");
+    }
+
+    /**
+     * Tugaskan sales ke pengajuan pembelian.
+     */
+    public function assignSales(Request $request, PurchaseRequest $purchaseRequest): RedirectResponse
+    {
+        abort_unless($request->user()->can('purchases.view') && ! $request->user()->isSales(), 403);
+
+        $validated = $request->validate([
+            'sales_id' => ['required', Rule::exists('users', 'id')->where('role', User::ROLE_SALES)->where('is_active', true)],
+        ], ['sales_id.required' => 'Pilih sales.', 'sales_id.exists' => 'Sales tidak ditemukan atau sudah nonaktif.']);
+
+        $sales = User::findOrFail($validated['sales_id']);
+        $purchaseRequest->update(['sales_id' => $sales->id]);
+
+        return redirect()->route('admin.purchase-requests.show', $purchaseRequest)
+            ->with('success', "Pengajuan berhasil ditugaskan ke Sales {$sales->name}.");
     }
 
     /**

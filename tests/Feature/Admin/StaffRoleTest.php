@@ -53,11 +53,11 @@ class StaffRoleTest extends TestCase
             'dashboard admin' => ['admin.dashboard', 200, 200, 403, 403],
             'kelola staf' => ['admin.staff.index', 200, 403, 403, 403],
             'tambah staf' => ['admin.staff.create', 200, 403, 403, 403],
-            // v1.14.0: Admin Dealer kembali mengelola merek & kategori (hapus tetap owner/super admin).
+            // v1.14.0: Admin Dealer mengelola merek & kategori (Owner hanya lihat sesuai matriks).
             'daftar merek' => ['admin.brands.index', 200, 200, 403, 403],
-            'tambah merek' => ['admin.brands.create', 200, 200, 403, 403],
+            'tambah merek' => ['admin.brands.create', 403, 200, 403, 403],
             'daftar kategori' => ['admin.categories.index', 200, 200, 403, 403],
-            'tambah kategori' => ['admin.categories.create', 200, 200, 403, 403],
+            'tambah kategori' => ['admin.categories.create', 403, 200, 403, 403],
             'laporan' => ['admin.reports.index', 200, 200, 403, 403],
             'pekerjaan mekanik' => ['mechanic.jobs.index', 403, 403, 200, 403],
         ];
@@ -74,7 +74,7 @@ class StaffRoleTest extends TestCase
         $this->get(route($route))->assertRedirect(route('login'));
     }
 
-    public function test_admin_dealer_tidak_bisa_menghapus_data_master(): void
+    public function test_admin_dealer_bisa_menghapus_data_master_dan_owner_hanya_lihat(): void
     {
         $car = Car::factory()->create();
         $brand = Brand::factory()->create();
@@ -82,7 +82,8 @@ class StaffRoleTest extends TestCase
         $promo = Promo::factory()->create();
         $service = Service::factory()->create();
 
-        $this->actingAs($this->admin);
+        // Owner hanya lihat (L) sesuai matriks: dilarang menghapus data master.
+        $this->actingAs($this->owner);
         foreach ([
             route('admin.cars.destroy', $car), route('admin.brands.destroy', $brand), route('admin.categories.destroy', $category),
             route('admin.promos.destroy', $promo), route('admin.services.destroy', $service),
@@ -93,13 +94,14 @@ class StaffRoleTest extends TestCase
             $this->assertModelExists($model);
         }
 
-        // Admin Dealer tetap bisa membuka daftar & form ubah serta laporan, tanpa tombol hapus.
-        $this->get(route('admin.services.index'))->assertOk()->assertDontSee('data-delete-url', false);
+        // Admin Dealer memegang operasional penuh (L T U H): bisa menghapus data master.
+        $this->actingAs($this->admin);
+        $this->get(route('admin.services.index'))->assertOk()->assertSee('data-delete-url', false);
         $this->get(route('admin.services.edit', $service))->assertOk();
         $this->get(route('admin.dashboard'))->assertSee(route('admin.reports.index'), false);
 
-        // Owner melihat tombol hapus.
-        $this->actingAs($this->owner)->get(route('admin.services.index'))->assertSee('data-delete-url', false);
+        $this->delete(route('admin.brands.destroy', $brand))->assertRedirect(route('admin.brands.index'));
+        $this->assertModelMissing($brand);
     }
 
     public function test_admin_dealer_mengelola_merek_dan_kategori(): void
@@ -262,7 +264,8 @@ class StaffRoleTest extends TestCase
 
         AdminActivityNotification::notifyAdmins(new TestDriveActivity($testDrive));
 
-        $this->assertSame(1, $this->owner->notifications()->count());
+        // Test drive dikelola Admin Dealer (Owner hanya lihat, tidak menerima notifikasi kelola test drive)
+        $this->assertSame(0, $this->owner->notifications()->count());
         $this->assertSame(1, $this->admin->notifications()->count());
         $this->assertSame(0, $this->mechanic->notifications()->count());
         $this->assertSame(0, $inactiveAdmin->notifications()->count());

@@ -114,13 +114,20 @@ class DashboardTrendTest extends TestCase
         PurchaseRequest::factory()->recycle($car)->status(PurchaseRequest::STATUS_APPROVED)
             ->create(['created_at' => '2026-10-02 10:00:00', 'car_price' => 275_000_000]);
 
-        $response = $this->actingAs($this->admin)->get(route('admin.dashboard'))->assertOk();
+        // Owner difokuskan ke pendapatan: melihat grafik tren dan angka rupiah
+        $owner = User::factory()->owner()->create();
+        $response = $this->actingAs($owner)->get(route('admin.dashboard'))->assertOk();
 
         $response->assertSee('Tren 6 Bulan Terakhir')
             ->assertSee('data-chart="activity"', false)
             ->assertSee('data-chart="sales"', false)
             ->assertSee('https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.js', false)
             ->assertSee('Rp 275.000.000');
+
+        // Admin Dealer: operasional murni, tanpa angka rupiah
+        $this->actingAs($this->admin)->get(route('admin.dashboard'))
+            ->assertOk()
+            ->assertDontSee('Rp 275.000.000');
 
         // Data di atribut sama dengan isi tabel.
         preg_match('/data-chart="sales" data-chart-data=\'([^\']+)\'/', $response->getContent(), $match);

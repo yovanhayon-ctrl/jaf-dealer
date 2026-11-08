@@ -58,6 +58,10 @@ class ChangePurchaseRequestStatus
         $car = Car::whereKey($purchaseRequest->car_id)->lockForUpdate()->firstOrFail();
 
         if ($status === PurchaseRequest::STATUS_APPROVED) {
+            if (auth()->check() && ! auth()->user()->can('purchases.approve')) {
+                throw new DomainException('Hanya Admin Dealer dan Super Admin yang berwenang menyetujui pengajuan pembelian.');
+            }
+
             if ($car->stock < 1) {
                 throw new DomainException(
                     "Stok mobil \"{$car->name} {$car->year}\" habis, pengajuan tidak bisa disetujui."

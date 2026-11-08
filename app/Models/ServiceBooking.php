@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
-    'user_id', 'service_id', 'vehicle_model', 'plate_number', 'vehicle_year', 'mileage',
+    'user_id', 'service_id', 'service_price', 'vehicle_model', 'plate_number', 'vehicle_year', 'mileage',
     'preferred_date', 'preferred_time', 'phone', 'complaint', 'status', 'admin_note',
     'mechanic_id', 'mechanic_chosen_by_customer', 'findings', 'started_at', 'finished_at',
 ])]
@@ -79,6 +79,7 @@ class ServiceBooking extends Model
     protected function casts(): array
     {
         return [
+            'service_price' => 'integer',
             'preferred_date' => 'date',
             'reminded_at' => 'datetime',
             'vehicle_year' => 'integer',

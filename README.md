@@ -477,18 +477,18 @@ Hasil Phase 17: 651 test lulus di SQLite dan MySQL; semua route dirujuk test; cr
 
 ## Peran Staf
 
-Enam peran staf (sejak v1.14.0). Aturan aksesnya ada di satu tempat: `User::PERMISSIONS` di `app/Models/User.php`.
+Enam peran staf dengan hak akses dan dashboard per role sesuai arahan dosen. Aturan akses terpusat di `User::PERMISSIONS` pada `app/Models/User.php`.
 
-| Peran | Fungsi utama | Tidak dapat |
-|---|---|---|
-| **Owner** | Pemilik dealer: semua menu, keputusan bisnis (promo, pembayaran, pengembalian dana), laporan, kelola semua akun staf, Pengaturan, hapus data master. | - |
-| **Super Admin** | Pengelola sistem: kelola akun staf, Pengaturan, hapus data master; menu lain untuk membantu bila ada masalah. | Mengelola akun Owner & Super Admin; promo, status pengajuan, verifikasi pembayaran, pengembalian dana. |
-| **Admin Dealer** | Mobil, merek, kategori, promo, test drive, pengajuan, pembayaran & pengembalian dana, servis, ulasan, pengguna, laporan & ekspor. | Kelola staf, Pengaturan, hapus data master. |
-| **Sales** | Melayani pembeli: test drive, proses status pengajuan; mobil & promo hanya lihat. | Ubah data mobil/promo, verifikasi pembayaran, pengembalian dana. |
-| **Customer Service** | Booking servis (konfirmasi, jadwal ulang, tugaskan mekanik); mobil, promo, test drive, pengajuan, ulasan, dan customer hanya lihat untuk menjawab pertanyaan. | Mengurus test drive, ubah transaksi finansial, moderasi ulasan, lihat akun staf. |
-| **Mekanik** | Panel sendiri: pekerjaan servis yang ditugaskan (checklist, temuan, selesai), layanan servis (lihat), rating. | Membuka panel admin. |
+| Peran | Dashboard | Menu & Fungsi Utama | Batasan Akses |
+|---|---|---|---|
+| **Owner** | Pendapatan: grafik & angka rupiah penjualan dan servis, tren 6 bulan, total pendapatan, unit terjual, servis selesai, stok habis, tombol backup. | Laporan keuangan (rupiah), Pengaturan profil dealer, Backup, Staf (semua), dan melihat (L) menu operasional. | Tidak memiliki tombol operasional harian (tambah mobil/promo). Operasional harian hanya lihat (L). |
+| **Super Admin** | Operasional murni (tanpa angka rupiah): mobil aktif, stok habis, pending TD/PR/servis, customer. | Mobil, merek, kategori, promo, layanan (L T U H); Test drive, pengajuan, servis (L S); Staf (L T U). | Tidak dapat mengakses Pengaturan (-), Laporan (-), mengelola akun Owner, atau melihat angka rupiah. |
+| **Admin Dealer** | Operasional murni (tanpa angka rupiah): mobil aktif, stok habis, pending TD/PR/servis, customer. | Mobil, merek, kategori, promo, layanan (L T U H); Test drive, pengajuan, servis (L S); Verifikasi pembayaran; Laporan (tanpa angka rupiah). | Tidak dapat melihat angka pendapatan (rupiah), tidak dapat mengakses Staf (-) dan Pengaturan (-). |
+| **Sales** | Khusus Sales: test drive & pengajuan pending miliknya, jadwal test drive hari ini & besok. | Test drive & pengajuan pembelian khusus yang ditugaskan kepadanya (`sales_id`); melihat mobil & promo (L). | Tidak dapat menyetujui pengajuan (approval kurangi stok hak Admin Dealer/Super Admin); tidak dapat melihat/mengubah data sales lain. |
+| **Customer Service** | Khusus CS: booking servis pending, test drive pending, ulasan baru masuk. | Booking servis (L S, jadwal ulang, penugasan mekanik); Test drive (L S); melihat mobil, promo, pengajuan, ulasan, pengguna (L). | Tidak dapat menyetujui pengajuan, tidak dapat memoderasi ulasan, tidak dapat mengakses laporan/staf/pengaturan. |
+| **Mekanik** | Khusus Mekanik (dialihkan ke `/mekanik/pekerjaan`): pekerjaan hari ini, sedang dikerjakan, selesai, dan rating. | Panel mandiri mekanik: checklist servis, catatan temuan, selesai servis, melihat daftar layanan & rating miliknya. | Dilarang masuk ke seluruh panel `/admin` (403). |
 
-Owner pertama: `php artisan user:make-owner email`. Peran lain dibuat di menu **Staf**. Tindakan sensitif (login staf, akun & Pengaturan, pembayaran & pengembalian dana, status pengajuan, hapus data master) tercatat di **Staf > Riwayat Aktivitas** (Owner & Super Admin; tidak bisa diubah atau dihapus). Rincian hak per menu: [docs/RELEASE-v1.14.0.md](docs/RELEASE-v1.14.0.md).
+Owner pertama dibuat via terminal: `php artisan user:make-owner email`. Peran lain dibuat di menu **Staf**. Tindakan sensitif tercatat di **Staf > Riwayat Aktivitas** (Owner & Super Admin; tidak bisa diubah atau dihapus).
 
 ## Keamanan
 

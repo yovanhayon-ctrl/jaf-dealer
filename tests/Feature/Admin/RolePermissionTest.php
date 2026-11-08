@@ -62,20 +62,20 @@ class RolePermissionTest extends TestCase
             'dashboard' => ['admin.dashboard', $all],
             'notifikasi' => ['admin.notifications.index', $all],
             'mobil' => ['admin.cars.index', [...$managers, 'sales', 'customer_service']],
-            'tambah mobil' => ['admin.cars.create', $managers],
+            'tambah mobil' => ['admin.cars.create', ['super_admin', 'admin']],
             'merek' => ['admin.brands.index', $managers],
             'kategori' => ['admin.categories.index', $managers],
             'promo' => ['admin.promos.index', [...$managers, 'sales', 'customer_service']],
-            'tambah promo' => ['admin.promos.create', ['owner', 'admin']],
+            'tambah promo' => ['admin.promos.create', ['super_admin', 'admin']],
             'test drive' => ['admin.test-drives.index', $all],
             'pengajuan' => ['admin.purchase-requests.index', $all],
             'booking servis' => ['admin.service-bookings.index', [...$managers, 'customer_service']],
-            'layanan servis' => ['admin.services.index', $managers],
+            'layanan servis' => ['admin.services.index', [...$managers, 'customer_service']],
             'ulasan' => ['admin.testimonials.index', [...$managers, 'customer_service']],
             'pengguna' => ['admin.users.index', [...$managers, 'customer_service']],
-            'laporan' => ['admin.reports.index', $managers],
+            'laporan' => ['admin.reports.index', ['owner', 'admin']],
             'staf' => ['admin.staff.index', ['owner', 'super_admin']],
-            'pengaturan' => ['admin.settings.edit', ['owner', 'super_admin']],
+            'pengaturan' => ['admin.settings.edit', ['owner']],
             'pekerjaan mekanik' => ['mechanic.jobs.index', ['mechanic']],
             'layanan mekanik' => ['mechanic.services.index', ['mechanic']],
             'notifikasi mekanik' => ['mechanic.notifications.index', ['mechanic']],
@@ -113,7 +113,8 @@ class RolePermissionTest extends TestCase
 
         $this->actingAs($this->users['super_admin'])->get(route('admin.dashboard'))
             ->assertSee('href="'.route('admin.staff.index').'"', false)
-            ->assertSee('href="'.route('admin.reports.index').'"', false);
+            ->assertDontSee('href="'.route('admin.reports.index').'"', false)
+            ->assertDontSee('href="'.route('admin.settings.edit').'"', false);
 
         $this->actingAs($this->users['mechanic'])->get(route('mechanic.jobs.index'))
             ->assertSee('href="'.route('mechanic.services.index').'"', false)
@@ -143,9 +144,9 @@ class RolePermissionTest extends TestCase
         $this->assertModelExists($promo);
     }
 
-    public function test_hapus_data_master_hanya_owner_dan_super_admin(): void
+    public function test_hapus_data_master_oleh_super_admin_dan_admin(): void
     {
-        foreach (['admin', 'sales', 'customer_service'] as $role) {
+        foreach (['owner', 'sales', 'customer_service'] as $role) {
             $brand = Brand::factory()->create();
             $this->actingAs($this->users[$role])->delete(route('admin.brands.destroy', $brand))->assertForbidden();
             $this->assertModelExists($brand);
@@ -155,14 +156,19 @@ class RolePermissionTest extends TestCase
         $this->actingAs($this->users['super_admin'])->get(route('admin.brands.index'))->assertSee('data-delete-url', false);
         $this->delete(route('admin.brands.destroy', $brand))->assertRedirect(route('admin.brands.index'));
         $this->assertModelMissing($brand);
+
+        $brand2 = Brand::factory()->create();
+        $this->actingAs($this->users['admin'])->delete(route('admin.brands.destroy', $brand2))->assertRedirect(route('admin.brands.index'));
+        $this->assertModelMissing($brand2);
     }
 
     public function test_pengajuan_sales_boleh_ubah_status_tanpa_urusan_pembayaran(): void
     {
-        $purchase = PurchaseRequest::factory()->status('approved')->create();
+        $sales = $this->users['sales'];
+        $purchase = PurchaseRequest::factory()->status('processing')->create(['sales_id' => $sales->id]);
         $proof = PaymentProof::factory()->recycle($purchase)->create(['purchase_request_id' => $purchase->id]);
 
-        $this->actingAs($this->users['sales'])->get(route('admin.purchase-requests.show', $purchase))
+        $this->actingAs($sales)->get(route('admin.purchase-requests.show', $purchase))
             ->assertOk()
             ->assertSee(route('admin.purchase-requests.update-status', $purchase), false)
             ->assertDontSee(route('admin.payment-proofs.approve', [$purchase, $proof]), false)
@@ -173,8 +179,8 @@ class RolePermissionTest extends TestCase
         $this->post(route('admin.payment-refunds.store', $purchase), [])->assertForbidden();
         $this->assertTrue($proof->fresh()->isPending());
 
-        $this->patch(route('admin.purchase-requests.update-status', $purchase), ['status' => 'completed'])->assertSessionHasNoErrors();
-        $this->assertSame('completed', $purchase->fresh()->status);
+        $this->patch(route('admin.purchase-requests.update-status', $purchase), ['status' => 'rejected', 'admin_note' => 'Ditolak karena alasan tertentu'])->assertSessionHasNoErrors();
+        $this->assertSame('rejected', $purchase->fresh()->status);
     }
 
     public function test_customer_service_hanya_melihat_pengajuan_dan_ulasan(): void
@@ -201,63 +207,61 @@ class RolePermissionTest extends TestCase
         $proof = PaymentProof::factory()->recycle($purchase)->create(['purchase_request_id' => $purchase->id]);
         $promo = Promo::factory()->create();
 
-        // Pengajuan: hanya lihat, tanpa ubah status, verifikasi bayar, file bukti, atau pengembalian dana.
+        // Pengajuan: Super Admin boleh ubah status (L S), tetapi tidak verifikasi bayar / bukti bayar.
         $this->actingAs($super)->get(route('admin.purchase-requests.show', $purchase))
             ->assertOk()
-            ->assertDontSee(route('admin.purchase-requests.update-status', $purchase), false)
+            ->assertSee(route('admin.purchase-requests.update-status', $purchase), false)
             ->assertDontSee(route('admin.payment-proofs.approve', [$purchase, $proof]), false);
-        $this->patch(route('admin.purchase-requests.update-status', $purchase), ['status' => 'completed'])->assertForbidden();
         $this->patch(route('admin.payment-proofs.approve', [$purchase, $proof]))->assertForbidden();
         $this->get(route('admin.payment-proofs.file', [$purchase, $proof]))->assertForbidden();
         $this->post(route('admin.payment-refunds.store', $purchase), [])->assertForbidden();
-        $this->assertSame('approved', $purchase->fresh()->status);
         $this->assertTrue($proof->fresh()->isPending());
 
-        // Promo: hanya lihat, tanpa ubah & hapus.
+        // Promo: Super Admin boleh mengelola promo (L T U H sesuai matriks).
         $this->get(route('admin.promos.index'))->assertOk()
-            ->assertDontSee(route('admin.promos.edit', $promo), false)
-            ->assertDontSee('data-delete-url="'.route('admin.promos.destroy', $promo).'"', false);
-        $this->get(route('admin.promos.edit', $promo))->assertForbidden();
-        $this->delete(route('admin.promos.destroy', $promo))->assertForbidden();
-        $this->assertModelExists($promo);
-
-        // Tugas sistem tetap: staf & pengaturan.
-        $this->get(route('admin.staff.index'))->assertOk();
-        $this->get(route('admin.settings.edit'))->assertOk();
-
-        // Owner tetap memegang keputusan bisnis.
-        $this->actingAs($this->users['owner'])->delete(route('admin.promos.destroy', $promo))->assertRedirect(route('admin.promos.index'));
+            ->assertSee(route('admin.promos.edit', $promo), false);
+        $this->get(route('admin.promos.edit', $promo))->assertOk();
+        $this->delete(route('admin.promos.destroy', $promo))->assertRedirect(route('admin.promos.index'));
         $this->assertModelMissing($promo);
+
+        // Super Admin TIDAK boleh mengakses Laporan dan Pengaturan (- / 403 sesuai matriks).
+        $this->get(route('admin.reports.index'))->assertForbidden();
+        $this->get(route('admin.settings.edit'))->assertForbidden();
+
+        // Staf: Super Admin boleh kelola staf (kecuali owner).
+        $this->get(route('admin.staff.index'))->assertOk();
     }
 
-    public function test_customer_service_hanya_melihat_test_drive_mobil_dan_promo(): void
+    public function test_customer_service_mengurus_test_drive_tetapi_hanya_melihat_mobil_dan_promo(): void
     {
         $testDrive = TestDrive::factory()->create(['status' => 'pending', 'admin_note' => 'Hubungi ulang sore.']);
         $car = Car::factory()->create();
         $promo = Promo::factory()->create();
 
+        // Customer Service boleh ubah status & jadwal test drive (L S sesuai matriks).
         $this->actingAs($this->users['customer_service'])->get(route('admin.test-drives.show', $testDrive))
             ->assertOk()
             ->assertSee('Hubungi ulang sore.')
-            ->assertSee('Status dan jadwal test drive diurus oleh Sales atau Admin Dealer.')
-            ->assertDontSee(route('admin.test-drives.update-status', $testDrive), false)
-            ->assertDontSee(route('admin.test-drives.reschedule', $testDrive), false);
-        $this->patch(route('admin.test-drives.update-status', $testDrive), ['status' => 'confirmed'])->assertForbidden();
+            ->assertSee(route('admin.test-drives.update-status', $testDrive), false)
+            ->assertSee(route('admin.test-drives.reschedule', $testDrive), false);
+        $this->patch(route('admin.test-drives.update-status', $testDrive), ['status' => 'confirmed'])->assertSessionHasNoErrors();
+        $this->assertSame('confirmed', $testDrive->fresh()->status);
         $this->patch(route('admin.test-drives.reschedule', $testDrive), [
             'preferred_date' => today()->addDays(3)->toDateString(), 'preferred_time' => TestDrive::TIME_SLOTS[0],
-        ])->assertForbidden();
-        $this->assertSame('pending', $testDrive->fresh()->status);
+        ])->assertSessionHasNoErrors();
 
+        // CS hanya melihat mobil dan promo (L).
         $this->get(route('admin.cars.index'))->assertOk()->assertDontSee(route('admin.cars.edit', $car), false);
         $this->get(route('admin.cars.edit', $car))->assertForbidden();
         $this->get(route('admin.promos.index'))->assertOk()->assertDontSee(route('admin.promos.edit', $promo), false);
         $this->get(route('admin.promos.create'))->assertForbidden();
 
-        // Sales tetap mengurus test drive.
+        // Sales tetap mengurus test drive miliknya.
+        $testDrive->update(['sales_id' => $this->users['sales']->id]);
         $this->actingAs($this->users['sales'])->get(route('admin.test-drives.show', $testDrive))
             ->assertSee(route('admin.test-drives.update-status', $testDrive), false);
-        $this->patch(route('admin.test-drives.update-status', $testDrive), ['status' => 'confirmed'])->assertSessionHasNoErrors();
-        $this->assertSame('confirmed', $testDrive->fresh()->status);
+        $this->patch(route('admin.test-drives.update-status', $testDrive), ['status' => 'cancelled', 'admin_note' => 'Customer berhalangan hadir'])->assertSessionHasNoErrors();
+        $this->assertSame('cancelled', $testDrive->fresh()->status);
     }
 
     public function test_customer_service_mengelola_booking_servis(): void

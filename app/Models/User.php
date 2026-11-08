@@ -71,37 +71,35 @@ class User extends Authenticatable
      * @var array<string, list<string>>
      */
     public const PERMISSIONS = [
-        // Super Admin mengelola sistem (akun, Pengaturan) dan melihat semua menu, tanpa keputusan bisnis:
-        // tidak mengelola promo, status pengajuan, pembayaran, dan pengembalian dana (hak Owner & Admin Dealer).
         'cars.view' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE],
-        'cars.manage' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
-        'catalog.manage' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
+        'cars.manage' => [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
+        'brands.view' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
+        'categories.view' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
+        'catalog.manage' => [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
         'promos.view' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE],
-        'promos.manage' => [self::ROLE_OWNER, self::ROLE_ADMIN],
-        // Hapus data master (mobil, merek, kategori, promo, layanan).
-        'master.delete' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN],
-        // Test drive dipegang Sales; Customer Service hanya melihat untuk menjawab pertanyaan customer.
+        'promos.manage' => [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
+        'master.delete' => [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
         'test-drives.view' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE],
-        'test-drives.manage' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_SALES],
+        'test-drives.manage' => [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE],
         'purchases.view' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE],
-        'purchases.status' => [self::ROLE_OWNER, self::ROLE_ADMIN, self::ROLE_SALES],
-        // Verifikasi bukti bayar, pembayaran di showroom, file bukti, dan pengembalian dana.
+        'purchases.status' => [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_SALES],
+        'purchases.approve' => [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
         'payments.manage' => [self::ROLE_OWNER, self::ROLE_ADMIN],
-        'service-bookings.manage' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE],
-        'services.manage' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
+        'service-bookings.view' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE],
+        'service-bookings.manage' => [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE],
+        'services.view' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE, self::ROLE_MECHANIC],
+        'services.manage' => [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
         'testimonials.view' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE],
-        'testimonials.moderate' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
-        // Daftar & detail customer; staff-accounts.view juga melihat akun staf.
+        'testimonials.moderate' => [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
         'users.view' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE],
         'staff-accounts.view' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
-        'reports.view' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
+        'reports.view' => [self::ROLE_OWNER, self::ROLE_ADMIN],
+        'reports.revenue' => [self::ROLE_OWNER],
         'staff.manage' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN],
-        // Staf > Riwayat Aktivitas (log tindakan sensitif, App\Models\ActivityLog).
         'activity.view' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN],
-        // Tombol "Kirim Pengingat Besok" di dashboard (cadangan bila hosting tanpa cron).
-        'reminders.send' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
-        // Menu Pengaturan: profil dealer, rekening pembayaran, hero beranda.
-        'settings.manage' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN],
+        'reminders.send' => [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE],
+        'settings.manage' => [self::ROLE_OWNER],
+        'backup.manage' => [self::ROLE_OWNER],
     ];
 
     /**
@@ -172,6 +170,16 @@ class User extends Authenticatable
         return $this->role === self::ROLE_MECHANIC;
     }
 
+    public function isSales(): bool
+    {
+        return $this->role === self::ROLE_SALES;
+    }
+
+    public function isCustomerService(): bool
+    {
+        return $this->role === self::ROLE_CUSTOMER_SERVICE;
+    }
+
     /**
      * Akun staf dealer (semua role selain customer): tidak memakai fitur customer (booking, pengajuan, favorit).
      */
@@ -237,6 +245,28 @@ class User extends Authenticatable
     public function assignedServiceBookings(): HasMany
     {
         return $this->hasMany(ServiceBooking::class, 'mechanic_id');
+    }
+
+    /** Test drive yang ditugaskan ke sales. */
+    public function salesTestDrives(): HasMany
+    {
+        return $this->hasMany(TestDrive::class, 'sales_id');
+    }
+
+    /** Pengajuan pembelian yang ditugaskan ke sales. */
+    public function salesPurchaseRequests(): HasMany
+    {
+        return $this->hasMany(PurchaseRequest::class, 'sales_id');
+    }
+
+    /**
+     * Sales aktif (untuk penugasan test drive & pengajuan).
+     *
+     * @return Builder<self>
+     */
+    public static function activeSales(): Builder
+    {
+        return self::query()->where('role', self::ROLE_SALES)->where('is_active', true)->orderBy('name');
     }
 
     /**

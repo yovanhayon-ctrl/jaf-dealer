@@ -101,9 +101,10 @@ class PaymentDueReminderTest extends TestCase
 
     public function test_detail_pengajuan_menampilkan_batas_pengingat_dan_whatsapp(): void
     {
-        $purchase = $this->approved('2026-10-18 09:00:00', ['payment_reminded_at' => now()]);
+        $sales = User::factory()->sales()->create();
+        $purchase = $this->approved('2026-10-18 09:00:00', ['payment_reminded_at' => now(), 'sales_id' => $sales->id]);
 
-        $html = $this->actingAs(User::factory()->sales()->create())->get(route('admin.purchase-requests.show', $purchase))
+        $html = $this->actingAs($sales)->get(route('admin.purchase-requests.show', $purchase))
             ->assertSee('Batas pembayaran pertama')
             ->assertSee('Rabu, 21 Okt 2026')
             ->assertSee('pengingat terkirim 20 Okt 2026 16:00')

@@ -63,6 +63,28 @@
                                class="btn btn-sm btn-outline-success py-0 ms-2"><i class="bi bi-whatsapp"></i>WhatsApp</a>
                         </dd>
 
+                        <dt>Sales Penanggung Jawab</dt>
+                        <dd>
+                            @if ($testDrive->sales)
+                                <span class="badge bg-primary-subtle text-primary-emphasis">{{ $testDrive->sales->name }}</span>
+                            @else
+                                <span class="text-muted">Belum ditugaskan</span>
+                            @endif
+                            @if (auth()->user()->can('test-drives.manage') && ! auth()->user()->isSales() && ! empty($salesStaff))
+                                <form method="POST" action="{{ route('admin.test-drives.assign-sales', $testDrive) }}" class="d-flex gap-2 align-items-center mt-2">
+                                    @csrf
+                                    @method('PATCH')
+                                    <select name="sales_id" class="form-select form-select-sm" required style="max-width: 180px;">
+                                        <option value="">Pilih Sales...</option>
+                                        @foreach ($salesStaff as $sId => $sName)
+                                            <option value="{{ $sId }}" @selected($testDrive->sales_id == $sId)>{{ $sName }}</option>
+                                        @endforeach
+                                    </select>
+                                    <button type="submit" class="btn btn-sm btn-outline-primary">Tugaskan</button>
+                                </form>
+                            @endif
+                        </dd>
+
                         <dt>Catatan customer</dt>
                         <dd>{{ $testDrive->notes ?: '—' }}</dd>
                     </dl>

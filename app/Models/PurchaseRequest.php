@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 #[Fillable([
-    'user_id', 'car_id', 'car_price', 'payment_method', 'down_payment', 'tenor_months',
+    'user_id', 'car_id', 'sales_id', 'car_price', 'payment_method', 'down_payment', 'tenor_months',
     'interest_rate', 'monthly_installment', 'phone', 'address', 'notes', 'status',
     'admin_note',
 ])]
@@ -164,6 +164,16 @@ class PurchaseRequest extends Model
     public function car(): BelongsTo
     {
         return $this->belongsTo(Car::class);
+    }
+
+    public function sales(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'sales_id');
+    }
+
+    public function isAssignedTo(?User $user): bool
+    {
+        return $user !== null && $this->sales_id === $user->id;
     }
 
     public function testimonial(): HasOne

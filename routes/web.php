@@ -229,14 +229,16 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         ->except('show')
         ->parameters(['merek' => 'brand'])
         ->names('brands')
-        ->middleware('can:catalog.manage')
+        ->middleware('can:brands.view')
+        ->middlewareFor(['create', 'store', 'edit', 'update'], 'can:catalog.manage')
         ->middlewareFor('destroy', 'can:master.delete');
 
     Route::resource('kategori', CategoryController::class)
         ->except('show')
         ->parameters(['kategori' => 'category'])
         ->names('categories')
-        ->middleware('can:catalog.manage')
+        ->middleware('can:categories.view')
+        ->middlewareFor(['create', 'store', 'edit', 'update'], 'can:catalog.manage')
         ->middlewareFor('destroy', 'can:master.delete');
 
     Route::resource('promo', AdminPromoController::class)
@@ -253,6 +255,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::get('{testDrive}', 'show')->name('show');
         Route::patch('{testDrive}/status', 'updateStatus')->middleware('can:test-drives.manage')->name('update-status');
         Route::patch('{testDrive}/jadwal', 'reschedule')->middleware('can:test-drives.manage')->name('reschedule');
+        Route::patch('{testDrive}/sales', 'assignSales')->middleware('can:test-drives.manage')->name('assign-sales');
     });
 
     Route::controller(AdminPurchaseRequestController::class)->prefix('pengajuan')->name('purchase-requests.')->middleware('can:purchases.view')->group(function () {
@@ -260,6 +263,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::get('{purchaseRequest}', 'show')->name('show');
         Route::get('{purchaseRequest}/pdf', 'pdf')->middleware('throttle:20,1')->name('pdf');
         Route::patch('{purchaseRequest}/status', 'updateStatus')->middleware('can:purchases.status')->name('update-status');
+        Route::patch('{purchaseRequest}/sales', 'assignSales')->middleware('can:purchases.view')->name('assign-sales');
     });
 
     // Verifikasi bukti pembayaran customer (bukti harus milik pengajuan di URL).
@@ -284,17 +288,18 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         ->except('show')
         ->parameters(['layanan' => 'service'])
         ->names('services')
-        ->middleware('can:services.manage')
+        ->middleware('can:services.view')
+        ->middlewareFor(['create', 'store', 'edit', 'update'], 'can:services.manage')
         ->middlewareFor('destroy', 'can:master.delete');
 
-    Route::controller(AdminServiceBookingController::class)->prefix('servis')->name('service-bookings.')->middleware('can:service-bookings.manage')->group(function () {
+    Route::controller(AdminServiceBookingController::class)->prefix('servis')->name('service-bookings.')->middleware('can:service-bookings.view')->group(function () {
         Route::get('/', 'index')->name('index');
         Route::get('{serviceBooking}', 'show')->name('show');
-        Route::patch('{serviceBooking}/status', 'updateStatus')->name('update-status');
-        Route::patch('{serviceBooking}/jadwal', 'reschedule')->name('reschedule');
-        Route::patch('{serviceBooking}/mekanik', 'assignMechanic')->name('assign-mechanic');
-        Route::post('{serviceBooking}/pekerjaan', 'addTask')->name('tasks.store');
-        Route::delete('{serviceBooking}/pekerjaan/{task}', 'removeTask')->scopeBindings()->name('tasks.destroy');
+        Route::patch('{serviceBooking}/status', 'updateStatus')->middleware('can:service-bookings.manage')->name('update-status');
+        Route::patch('{serviceBooking}/jadwal', 'reschedule')->middleware('can:service-bookings.manage')->name('reschedule');
+        Route::patch('{serviceBooking}/mekanik', 'assignMechanic')->middleware('can:service-bookings.manage')->name('assign-mechanic');
+        Route::post('{serviceBooking}/pekerjaan', 'addTask')->middleware('can:service-bookings.manage')->name('tasks.store');
+        Route::delete('{serviceBooking}/pekerjaan/{task}', 'removeTask')->middleware('can:service-bookings.manage')->scopeBindings()->name('tasks.destroy');
     });
 
     // Moderasi ulasan customer (tampil di beranda setelah disetujui).

@@ -89,6 +89,17 @@ class AdminReport
     }
 
     /**
+     * Total pendapatan servis yang selesai dalam periode ini (rupiah).
+     */
+    public function serviceRevenue(): int
+    {
+        return $this->memo[__FUNCTION__] ??= (int) DB::table('service_bookings')
+            ->where('status', ServiceBooking::STATUS_COMPLETED)
+            ->whereBetween('preferred_date', [$this->period->from->toDateTimeString(), $this->period->to->toDateTimeString()])
+            ->sum(DB::raw('COALESCE(service_price, 0)'));
+    }
+
+    /**
      * Jumlah booking servis per layanan (semua status) dan yang selesai, urut terbanyak.
      *
      * @return Collection<int, object{name: string, total: int, completed: int}>

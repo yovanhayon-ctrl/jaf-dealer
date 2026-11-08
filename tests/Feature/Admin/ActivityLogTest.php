@@ -133,8 +133,10 @@ class ActivityLogTest extends TestCase
         $used = Brand::factory()->create(['name' => 'Nissan']);
         Car::factory()->create(['brand_id' => $used->id]);
 
-        $this->actingAs(User::factory()->admin()->create())->delete(route('admin.brands.destroy', $unused))->assertForbidden();
-        $this->actingAs($this->owner)->delete(route('admin.brands.destroy', $used));
+        // Role yang tidak berhak menghapus (misal sales): ditolak.
+        $this->actingAs(User::factory()->sales()->create())->delete(route('admin.brands.destroy', $unused))->assertForbidden();
+        $admin = User::factory()->admin()->create();
+        $this->actingAs($admin)->delete(route('admin.brands.destroy', $used));
         $this->delete(route('admin.brands.destroy', $unused))->assertRedirect(route('admin.brands.index'));
 
         $log = ActivityLog::query()->sole();

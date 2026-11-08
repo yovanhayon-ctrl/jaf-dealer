@@ -66,7 +66,7 @@ class SettingTest extends TestCase
             ->assertDontSee('Kosongkan untuk kembali ke bawaan')
             ->assertSee('href="'.route('admin.settings.edit').'"', false);
 
-        $this->actingAs(User::factory()->superAdmin()->create())->get(route('admin.settings.edit'))->assertOk();
+        $this->actingAs(User::factory()->superAdmin()->create())->get(route('admin.settings.edit'))->assertForbidden();
         $this->actingAs(User::factory()->admin()->create())->get(route('admin.settings.edit'))->assertForbidden();
         $this->actingAs(User::factory()->admin()->create())->put(route('admin.settings.update'), $this->form())->assertForbidden();
     }
@@ -188,14 +188,14 @@ class SettingTest extends TestCase
     {
         $otherOwner = User::factory()->owner()->create(['name' => 'Yoseph']);
         User::factory()->owner()->create(['is_active' => false]);
-        $super = User::factory()->superAdmin()->create(['name' => 'Rifky']);
+        $ownerActor = User::factory()->owner()->create(['name' => 'Rifky']);
 
         // Bukan perubahan rekening: tidak ada notifikasi.
-        $this->save(['tagline' => 'Baru'], $super);
+        $this->save(['tagline' => 'Baru'], $ownerActor);
         $this->assertSame(0, $otherOwner->notifications()->count());
 
         $this->travelTo(now()->setDateTime(2026, 10, 20, 10, 30));
-        $this->save(['bank_name' => 'BNI', 'bank_account' => '9876543210', 'bank_holder' => 'PT JAF Dealer'], $super);
+        $this->save(['bank_name' => 'BNI', 'bank_account' => '9876543210', 'bank_holder' => 'PT JAF Dealer'], $ownerActor);
 
         foreach ([$this->owner, $otherOwner] as $owner) {
             $notification = $owner->notifications()->sole();
@@ -203,7 +203,7 @@ class SettingTest extends TestCase
             $this->assertSame('Rekening Pembayaran Diubah · Rifky', $notification->data['title']);
             $this->assertSame('Rekening sekarang: BNI 9876543210 a.n. PT JAF Dealer. Sebelumnya: BCA 1111111111 a.n. PT JAF Dealer.', $notification->data['message']);
         }
-        $this->assertSame(0, $super->notifications()->count());
+        $this->assertSame(0, $ownerActor->notifications()->count());
 
         $this->actingAs($this->owner)->get(route('admin.notifications.open', $this->owner->notifications()->sole()->id))
             ->assertRedirect(route('admin.settings.edit').'#rekening');

@@ -80,6 +80,28 @@
                                class="btn btn-sm btn-outline-success py-0 ms-2"><i class="bi bi-whatsapp"></i>WhatsApp</a>
                         </dd>
 
+                        <dt>Sales Penanggung Jawab</dt>
+                        <dd>
+                            @if ($purchaseRequest->sales)
+                                <span class="badge bg-primary-subtle text-primary-emphasis">{{ $purchaseRequest->sales->name }}</span>
+                            @else
+                                <span class="text-muted">Belum ditugaskan</span>
+                            @endif
+                            @if (! auth()->user()->isSales() && ! empty($salesStaff))
+                                <form method="POST" action="{{ route('admin.purchase-requests.assign-sales', $purchaseRequest) }}" class="d-flex gap-2 align-items-center mt-2">
+                                    @csrf
+                                    @method('PATCH')
+                                    <select name="sales_id" class="form-select form-select-sm" required style="max-width: 180px;">
+                                        <option value="">Pilih Sales...</option>
+                                        @foreach ($salesStaff as $sId => $sName)
+                                            <option value="{{ $sId }}" @selected($purchaseRequest->sales_id == $sId)>{{ $sName }}</option>
+                                        @endforeach
+                                    </select>
+                                    <button type="submit" class="btn btn-sm btn-outline-primary">Tugaskan</button>
+                                </form>
+                            @endif
+                        </dd>
+
                         <dt>Alamat</dt>
                         <dd>{{ $purchaseRequest->address }}</dd>
 
@@ -164,8 +186,10 @@
                         @endif
 
                         @forelse ($purchaseRequest->paymentProofs as $proof)
-                            @php($bag = $errors->getBag("rejectProof{$proof->id}"))
-                            @php($fileUrl = route('admin.payment-proofs.file', [$purchaseRequest, $proof]))
+                            @php
+                                $bag = $errors->getBag('rejectProof'.$proof->id);
+                                $fileUrl = route('admin.payment-proofs.file', [$purchaseRequest, $proof]);
+                            @endphp
                             <div class="admin-proof d-flex gap-3">
                                 @if ($canPay && $proof->hasFile())
                                     <a href="{{ $fileUrl }}" target="_blank" rel="noopener" class="admin-proof-thumb" aria-label="Buka file bukti {{ $proof->typeLabel() }}">
@@ -238,7 +262,9 @@
 
                         {{-- Pembayaran langsung di showroom: dicatat admin, langsung diterima. --}}
                         @if ($canPay && $purchaseRequest->status === PurchaseRequest::STATUS_APPROVED && ! $purchaseRequest->isPaidOff())
-                            @php($showroomErrors = $errors->getBag('showroomPayment'))
+                            @php
+                                $showroomErrors = $errors->getBag('showroomPayment');
+                            @endphp
                             <div class="mt-3 pt-3 border-top">
                                 <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#showroom-payment"
                                         aria-expanded="{{ $showroomErrors->any() ? 'true' : 'false' }}" aria-controls="showroom-payment">
@@ -248,7 +274,9 @@
                                       @class(['collapse mt-3', 'show' => $showroomErrors->any()]) id="showroom-payment" novalidate
                                       data-confirm="Catat pembayaran ini sebagai diterima? Pastikan uang sudah diterima kasir.">
                                     @csrf
-                                    @php($fieldError = fn (string $field) => $showroomErrors->first($field))
+                                    @php
+                                        $fieldError = fn (string $field) => $showroomErrors->first($field);
+                                    @endphp
                                     <div class="row g-2">
                                         <div class="col-sm-6">
                                             <label for="sp-type" class="form-label small">Jenis pembayaran</label>
@@ -308,8 +336,10 @@
 
                         {{-- Pengembalian dana: pengajuan batal yang sempat menerima pembayaran. --}}
                         @if ($purchaseRequest->refundStatus())
-                            @php($refundErrors = $errors->getBag('refund'))
-                            @php($closeErrors = $errors->getBag('refundClose'))
+                            @php
+                                $refundErrors = $errors->getBag('refund');
+                                $closeErrors = $errors->getBag('refundClose');
+                            @endphp
                             <div class="mt-3 pt-3 border-top" id="pengembalian-dana">
                                 <div class="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mb-2">
                                     <h4 class="h6 mb-0">Pengembalian Dana</h4>
@@ -328,7 +358,9 @@
                                 @endif
 
                                 @foreach ($purchaseRequest->paymentRefunds as $refund)
-                                    @php($refundUrl = route('admin.payment-refunds.file', [$purchaseRequest, $refund]))
+                                    @php
+                                        $refundUrl = route('admin.payment-refunds.file', [$purchaseRequest, $refund]);
+                                    @endphp
                                     <div class="admin-proof d-flex gap-3">
                                         @if ($canPay && $refund->hasFile())
                                             <a href="{{ $refundUrl }}" target="_blank" rel="noopener" class="admin-proof-thumb" aria-label="Buka bukti pengembalian">
@@ -380,7 +412,9 @@
                                           @class(['collapse mt-3', 'show' => $refundErrors->any()]) id="refund-form" novalidate
                                           data-confirm="Catat pengembalian dana ini? Pastikan uang sudah dikembalikan ke customer.">
                                         @csrf
-                                        @php($refundError = fn (string $field) => $refundErrors->first($field))
+                                        @php
+                                            $refundError = fn (string $field) => $refundErrors->first($field);
+                                        @endphp
                                         <div class="row g-2">
                                             <div class="col-sm-6">
                                                 <label for="rf-amount" class="form-label small">Nominal dikembalikan (Rp)</label>
@@ -463,11 +497,17 @@
             <div class="card admin-sticky-panel">
                 <div class="card-body p-4">
                     <h3 class="admin-card-title">Status & Catatan Admin</h3>
-                    @can('purchases.status')
+                    @if (auth()->user()->can('purchases.status'))
+                        @php
+                            $allowedTransitions = $purchaseRequest->allowedTransitions();
+                            if (auth()->user()->isSales()) {
+                                $allowedTransitions = array_values(array_diff($allowedTransitions, [\App\Models\PurchaseRequest::STATUS_APPROVED]));
+                            }
+                        @endphp
                         @include('admin.partials.status-form', [
                             'action' => route('admin.purchase-requests.update-status', $purchaseRequest),
                             'currentLabel' => $purchaseRequest->statusLabel(),
-                            'allowed' => collect($purchaseRequest->allowedTransitions())
+                            'allowed' => collect($allowedTransitions)
                                 ->mapWithKeys(fn ($status) => [$status => PurchaseRequest::STATUS_LABELS[$status]])
                                 ->all(),
                             'adminNote' => $purchaseRequest->admin_note,
@@ -475,11 +515,11 @@
                             'noteTemplates' => $purchaseRequest->noteTemplates(),
                         ])
                     @else
-                        {{-- Customer Service: hanya melihat. --}}
+                        {{-- Customer Service / yang tidak boleh ubah status: hanya melihat. --}}
                         <p class="small mb-2">Status: <x-status-badge :status="$purchaseRequest->status" /></p>
                         <p class="small text-muted mb-1">Catatan admin</p>
                         <p class="small mb-0">{{ $purchaseRequest->admin_note ?: '-' }}</p>
-                    @endcan
+                    @endif
 
                     @if ($purchaseRequest->status === PurchaseRequest::STATUS_APPROVED && $purchaseRequest->verifiedPaymentTotal() > 0)
                         <div class="alert alert-warning small py-2 mt-3 mb-0">

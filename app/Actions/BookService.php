@@ -40,6 +40,7 @@ class BookService
             $booking = ServiceBooking::create([
                 'user_id' => $user->id,
                 'service_id' => $service->id,
+                'service_price' => $service->price_from,
                 'vehicle_model' => $data['vehicle_model'],
                 'plate_number' => $data['plate_number'],
                 'vehicle_year' => $data['vehicle_year'] ?? null,

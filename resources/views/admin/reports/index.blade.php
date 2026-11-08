@@ -92,8 +92,14 @@
     <div class="row row-cols-1 row-cols-sm-2 row-cols-xl-4 g-3 mb-4">
         <div class="col"><x-stat-card label="Total Pengajuan" :value="$purchases['total']" icon="bi-file-earmark-text" color="navy" /></div>
         <div class="col"><x-stat-card label="Unit Terjual" :value="$purchases['units_sold']" icon="bi-bag-check" color="green" /></div>
-        <div class="col"><x-stat-card label="Nilai Penjualan" :value="$rupiah($purchases['sales_value'])" icon="bi-cash-stack" color="red" /></div>
+        @can('reports.revenue')
+            <div class="col"><x-stat-card label="Nilai Penjualan" :value="$rupiah($purchases['sales_value'])" icon="bi-cash-stack" color="red" /></div>
+            <div class="col"><x-stat-card label="Pendapatan Servis" :value="$rupiah($report->serviceRevenue())" icon="bi-wrench" color="yellow" /></div>
+        @endcan
         <div class="col"><x-stat-card label="Test Drive Selesai" :value="$percentLabel($testDrives['completion_rate'])" icon="bi-calendar-check" color="blue" /></div>
+        @cannot('reports.revenue')
+            <div class="col"><x-stat-card label="Servis Selesai" :value="$percentLabel($services['completion_rate'])" icon="bi-wrench-adjustable" color="dark" /></div>
+        @endcannot
     </div>
 
     <div class="row g-4 mb-4">
@@ -150,8 +156,10 @@
                     <dl class="row small mb-0">
                         <dt class="col-7 text-muted fw-normal">Unit terjual</dt>
                         <dd class="col-5 text-end">{{ $purchases['units_sold'] }}</dd>
-                        <dt class="col-7 text-muted fw-normal mb-0">Nilai penjualan</dt>
-                        <dd class="col-5 text-end fw-semibold mb-0"><x-price :amount="$purchases['sales_value']" /></dd>
+                        @can('reports.revenue')
+                            <dt class="col-7 text-muted fw-normal mb-0">Nilai penjualan</dt>
+                            <dd class="col-5 text-end fw-semibold mb-0"><x-price :amount="$purchases['sales_value']" /></dd>
+                        @endcan
                     </dl>
                 </div>
             </div>
@@ -172,8 +180,10 @@
                                     <tr>
                                         <th>{{ $column }}</th>
                                         <th class="text-center">Unit</th>
-                                        <th class="text-end">Nilai</th>
-                                        <th style="width: 30%">Porsi nilai</th>
+                                        @can('reports.revenue')
+                                            <th class="text-end">Nilai</th>
+                                            <th style="width: 30%">Porsi nilai</th>
+                                        @endcan
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -182,11 +192,13 @@
                                         <tr>
                                             <td>{{ $row->name }}</td>
                                             <td class="text-center">{{ $row->units }}</td>
-                                            <td class="text-end"><x-price :amount="$row->value" /></td>
-                                            <td>
-                                                @include('admin.reports._bar', ['value' => $share])
-                                                <div class="small text-muted">{{ $percentLabel($share) }}</div>
-                                            </td>
+                                            @can('reports.revenue')
+                                                <td class="text-end"><x-price :amount="$row->value" /></td>
+                                                <td>
+                                                    @include('admin.reports._bar', ['value' => $share])
+                                                    <div class="small text-muted">{{ $percentLabel($share) }}</div>
+                                                </td>
+                                            @endcan
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -212,7 +224,9 @@
                                     <th class="text-center" style="width: 50px">#</th>
                                     <th>Mobil</th>
                                     <th class="text-center">Unit</th>
-                                    <th class="text-end">Nilai</th>
+                                    @can('reports.revenue')
+                                        <th class="text-end">Nilai</th>
+                                    @endcan
                                 </tr>
                             </thead>
                             <tbody>
@@ -221,7 +235,9 @@
                                         <td class="text-center text-muted">{{ $loop->iteration }}</td>
                                         <td>{{ $car->name }}</td>
                                         <td class="text-center">{{ $car->units }}</td>
-                                        <td class="text-end"><x-price :amount="$car->value" /></td>
+                                        @can('reports.revenue')
+                                            <td class="text-end"><x-price :amount="$car->value" /></td>
+                                        @endcan
                                     </tr>
                                 @endforeach
                             </tbody>
