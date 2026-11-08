@@ -101,4 +101,25 @@ class SparePart extends Model
     {
         return $this->image ? Storage::disk('public')->url($this->image) : null;
     }
+
+    /**
+     * Link WhatsApp pemesanan suku cadang dengan format pesan otomatis.
+     */
+    public function whatsappOrderUrl(): ?string
+    {
+        $number = preg_replace('/\D/', '', (string) config('dealer.whatsapp'));
+
+        if ($number === '') {
+            return null;
+        }
+
+        $dealerName = config('dealer.name') ?: 'JAF Dealer';
+        $message = "Halo {$dealerName}, saya ingin memesan suku cadang:\n"
+            ."• Part: {$this->name}\n"
+            ."• Kode Part: {$this->part_number}\n"
+            ."• Harga: {$this->formattedPrice()} / {$this->unit}\n\n"
+            .'Apakah stok masih tersedia? Link: '.route('spare-parts.show', $this);
+
+        return "https://wa.me/{$number}?text=".rawurlencode($message);
+    }
 }

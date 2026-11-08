@@ -48,6 +48,7 @@ use App\Http\Controllers\PurchaseRequestController;
 use App\Http\Controllers\SeoController;
 use App\Http\Controllers\ServiceBookingController;
 use App\Http\Controllers\ServiceController;
+use App\Http\Controllers\SparePartController;
 use App\Http\Controllers\TestDriveController;
 use Illuminate\Support\Facades\Route;
 
@@ -64,6 +65,8 @@ Route::get('/promo', [PromoController::class, 'index'])->name('promos.index');
 Route::get('/promo/{promo:slug}', [PromoController::class, 'show'])->name('promos.show');
 Route::get('/simulasi-kredit', [CreditSimulationController::class, 'index'])->name('credit.index');
 Route::get('/servis', [ServiceController::class, 'index'])->name('services.index');
+Route::get('/spare-part', [SparePartController::class, 'index'])->name('spare-parts.index');
+Route::get('/spare-part/{sparePart:slug}', [SparePartController::class, 'show'])->name('spare-parts.show');
 
 // Bandingkan mobil (pilihan di session, tamu boleh).
 Route::get('/bandingkan', [CompareController::class, 'index'])->name('compare.index');

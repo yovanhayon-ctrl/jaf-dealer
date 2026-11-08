@@ -12,6 +12,7 @@
         'Layanan' => [
             'test-drives.create' => 'Test Drive',
             'services.index' => 'Servis',
+            'spare-parts.index' => 'Spare Part',
             'credit.index' => 'Simulasi Kredit',
         ],
         'Perusahaan' => [

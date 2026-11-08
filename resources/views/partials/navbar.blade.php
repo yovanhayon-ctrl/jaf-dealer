@@ -7,6 +7,7 @@
         ['route' => 'credit.index', 'label' => 'Simulasi Kredit', 'active' => 'credit.*'],
         ['route' => 'test-drives.create', 'label' => 'Test Drive', 'active' => 'test-drives.*'],
         ['route' => 'services.index', 'label' => 'Servis', 'active' => ['services.*', 'service-bookings.*']],
+        ['route' => 'spare-parts.index', 'label' => 'Spare Part', 'active' => 'spare-parts.*'],
         ['route' => 'about', 'label' => 'Tentang Kami', 'active' => 'about'],
         ['route' => 'contact', 'label' => 'Kontak', 'active' => 'contact'],
     ];
