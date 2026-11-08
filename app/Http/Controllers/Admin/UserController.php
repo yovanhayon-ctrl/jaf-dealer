@@ -24,8 +24,7 @@ class UserController extends Controller
     public const ROLE_FILTERS = [
         User::ROLE_CUSTOMER => 'Customer',
         User::ROLE_OWNER => 'Owner',
-        User::ROLE_SUPER_ADMIN => 'Super Admin',
-        User::ROLE_ADMIN => 'Admin Dealer',
+        User::ROLE_ADMIN => 'Admin',
         User::ROLE_SALES => 'Sales',
         User::ROLE_CUSTOMER_SERVICE => 'Customer Service',
         User::ROLE_MECHANIC => 'Mekanik',

@@ -240,10 +240,11 @@ class RoleBasedDashboardTest extends TestCase
             'created_at' => now(),
         ]);
 
-        // Super Admin ditolak akses laporan (403)
-        $this->actingAs($this->superAdmin)->get(route('admin.reports.index'))->assertForbidden();
+        // Sales & CS ditolak akses laporan (403)
+        $this->actingAs($this->sales1)->get(route('admin.reports.index'))->assertForbidden();
+        $this->actingAs($this->customerService)->get(route('admin.reports.index'))->assertForbidden();
 
-        // Admin Dealer boleh akses laporan tetapi TANPA angka rupiah
+        // Admin boleh akses laporan tetapi TANPA angka rupiah
         $adminReport = $this->actingAs($this->admin)->get(route('admin.reports.index'));
         $adminReport->assertOk()
             ->assertSee('Total Pengajuan')

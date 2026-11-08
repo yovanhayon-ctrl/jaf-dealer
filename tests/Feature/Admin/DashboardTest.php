@@ -141,12 +141,14 @@ class DashboardTest extends TestCase
             ->assertSee('href="'.route('admin.test-drives.index').'"', false)
             ->assertSee('href="'.route('admin.purchase-requests.index').'"', false)
             ->assertSee('href="'.route('admin.reports.index').'"', false)
-            ->assertDontSee('href="'.route('admin.staff.index').'"', false)
-            ->assertSeeInOrder(['Dashboard', 'Mobil', 'Merek', 'Kategori', 'Promo', 'Test Drive', 'Pengajuan', 'Pengguna', 'Laporan']);
+            ->assertSee('href="'.route('admin.staff.index').'"', false)
+            ->assertDontSee('href="'.route('admin.settings.edit').'"', false)
+            ->assertSeeInOrder(['Dashboard', 'Mobil', 'Merek', 'Kategori', 'Promo', 'Test Drive', 'Pengajuan', 'Booking Servis', 'Layanan Servis', 'Ulasan', 'Pengguna', 'Laporan', 'Staf']);
 
-        // Staf hanya untuk owner & super admin.
+        // Owner hanya melihat Dashboard, Notifikasi, Laporan, Staf, Pengaturan.
         $this->actingAs(User::factory()->owner()->create())->get('/admin/dashboard')
-            ->assertSeeInOrder(['Dashboard', 'Mobil', 'Merek', 'Kategori', 'Promo', 'Pengguna', 'Laporan', 'Staf']);
+            ->assertSeeInOrder(['Dashboard', 'Notifikasi', 'Laporan', 'Staf', 'Pengaturan'])
+            ->assertDontSee('href="'.route('admin.cars.index').'"', false);
     }
 
     public function test_kartu_pending_mengarah_ke_daftar_terfilter(): void

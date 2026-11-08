@@ -65,7 +65,7 @@ class ActivityLogTest extends TestCase
 
         $this->assertSame([
             'Menambah akun staf Rina Kartika sebagai Sales',
-            'Mengubah akun Rina Kartika: role Sales → Admin Dealer, dinonaktifkan, kata sandi direset',
+            'Mengubah akun Rina Kartika: role Sales → Admin, dinonaktifkan, kata sandi direset',
             'Mengubah akun Rina Kartika: diaktifkan',
         ], $this->descriptions());
 
@@ -171,8 +171,8 @@ class ActivityLogTest extends TestCase
         $sales->delete();
         $this->get(route('admin.staff.activity'))->assertSee('Yoseph');
 
-        $this->actingAs(User::factory()->superAdmin()->create())->get(route('admin.staff.activity'))->assertOk();
-        foreach (['admin', 'sales', 'customerService', 'mechanic'] as $role) {
+        $this->actingAs(User::factory()->admin()->create())->get(route('admin.staff.activity'))->assertOk();
+        foreach (['sales', 'customerService', 'mechanic'] as $role) {
             $this->actingAs(User::factory()->{$role}()->create())->get(route('admin.staff.activity'))->assertForbidden();
         }
     }

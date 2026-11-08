@@ -20,13 +20,13 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
-    /** Pemilik dealer: semua menu + kelola semua akun staf. */
+    /** Pemilik dealer: pengawas bisnis & pengambil keputusan (dashboard, laporan, staf, pengaturan). */
     public const ROLE_OWNER = 'owner';
 
-    /** Semua menu; kelola akun staf kecuali Owner & Super Admin. */
+    /** Super Admin (dilebur ke Admin). */
     public const ROLE_SUPER_ADMIN = 'super_admin';
 
-    /** Admin Dealer: operasional (mobil, katalog, promo, transaksi, servis, ulasan, laporan). */
+    /** Admin: mengelola seluruh operasional dan sistem dealer. */
     public const ROLE_ADMIN = 'admin';
 
     /** Melayani pembeli: test drive & pengajuan; mobil & promo hanya lihat. */
@@ -43,7 +43,7 @@ class User extends Authenticatable
     public const ROLE_LABELS = [
         self::ROLE_OWNER => 'Owner',
         self::ROLE_SUPER_ADMIN => 'Super Admin',
-        self::ROLE_ADMIN => 'Admin Dealer',
+        self::ROLE_ADMIN => 'Admin',
         self::ROLE_SALES => 'Sales',
         self::ROLE_CUSTOMER_SERVICE => 'Customer Service',
         self::ROLE_MECHANIC => 'Mekanik',
@@ -52,16 +52,16 @@ class User extends Authenticatable
 
     /** Role yang bisa diberikan lewat menu Staf (owner baru lewat perintah user:make-owner). */
     public const ASSIGNABLE_STAFF_ROLES = [
-        self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE, self::ROLE_MECHANIC,
+        self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE, self::ROLE_MECHANIC,
     ];
 
     public const STAFF_ROLES = [
-        self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE, self::ROLE_MECHANIC,
+        self::ROLE_OWNER, self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE, self::ROLE_MECHANIC,
     ];
 
     /** Bisa membuka panel admin (semua staf kecuali mekanik, yang punya panel sendiri). */
     public const PANEL_ROLES = [
-        self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE,
+        self::ROLE_OWNER, self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE,
     ];
 
     /**
@@ -71,44 +71,45 @@ class User extends Authenticatable
      * @var array<string, list<string>>
      */
     public const PERMISSIONS = [
-        'cars.view' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE],
-        'cars.manage' => [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
-        'brands.view' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
-        'categories.view' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
-        'catalog.manage' => [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
-        'promos.view' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE],
-        'promos.manage' => [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
-        'master.delete' => [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
-        'test-drives.view' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE],
-        'test-drives.manage' => [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE],
-        'purchases.view' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE],
-        'purchases.status' => [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_SALES],
-        'purchases.approve' => [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
-        'payments.manage' => [self::ROLE_OWNER, self::ROLE_ADMIN],
-        'service-bookings.view' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE],
-        'service-bookings.manage' => [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE],
-        'services.view' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE, self::ROLE_MECHANIC],
-        'services.manage' => [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
-        'testimonials.view' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE],
-        'testimonials.moderate' => [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
-        'users.view' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE],
-        'staff-accounts.view' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN],
+        'cars.view' => [self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE],
+        'cars.manage' => [self::ROLE_ADMIN],
+        'brands.view' => [self::ROLE_ADMIN],
+        'categories.view' => [self::ROLE_ADMIN],
+        'catalog.manage' => [self::ROLE_ADMIN],
+        'promos.view' => [self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE],
+        'promos.manage' => [self::ROLE_ADMIN],
+        'master.delete' => [self::ROLE_ADMIN],
+        'test-drives.view' => [self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE],
+        'test-drives.manage' => [self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE],
+        'purchases.view' => [self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE],
+        'purchases.status' => [self::ROLE_ADMIN, self::ROLE_SALES],
+        'purchases.approve' => [self::ROLE_ADMIN],
+        'payments.manage' => [self::ROLE_ADMIN],
+        'service-bookings.view' => [self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE],
+        'service-bookings.manage' => [self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE],
+        'services.view' => [self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE, self::ROLE_MECHANIC],
+        'services.manage' => [self::ROLE_ADMIN],
+        'testimonials.view' => [self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE],
+        'testimonials.moderate' => [self::ROLE_ADMIN],
+        'users.view' => [self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE],
+        'staff-accounts.view' => [self::ROLE_OWNER, self::ROLE_ADMIN],
         'reports.view' => [self::ROLE_OWNER, self::ROLE_ADMIN],
         'reports.revenue' => [self::ROLE_OWNER],
-        'staff.manage' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN],
-        'activity.view' => [self::ROLE_OWNER, self::ROLE_SUPER_ADMIN],
-        'reminders.send' => [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE],
+        'staff.manage' => [self::ROLE_OWNER, self::ROLE_ADMIN],
+        'activity.view' => [self::ROLE_OWNER, self::ROLE_ADMIN],
+        'reminders.send' => [self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE],
         'settings.manage' => [self::ROLE_OWNER],
         'backup.manage' => [self::ROLE_OWNER],
     ];
 
     /**
-     * Role yang boleh dibuat/diubah lewat menu Staf oleh role tertentu. Super Admin tidak bisa mengelola Owner & Super Admin.
+     * Role yang boleh dibuat/diubah lewat menu Staf oleh role tertentu. Admin tidak bisa mengelola akun Owner.
      *
      * @var array<string, list<string>>
      */
     public const MANAGEABLE_STAFF_ROLES = [
         self::ROLE_OWNER => self::ASSIGNABLE_STAFF_ROLES,
+        self::ROLE_ADMIN => [self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE, self::ROLE_MECHANIC],
         self::ROLE_SUPER_ADMIN => [self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE, self::ROLE_MECHANIC],
     ];
 

@@ -22,7 +22,7 @@ class StaffController extends Controller
     {
         $staff = User::query()
             ->whereIn('role', User::STAFF_ROLES)
-            ->orderByRaw("CASE role WHEN 'owner' THEN 0 WHEN 'super_admin' THEN 1 WHEN 'admin' THEN 2 WHEN 'sales' THEN 3 WHEN 'customer_service' THEN 4 ELSE 5 END")
+            ->orderByRaw("CASE role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 WHEN 'sales' THEN 2 WHEN 'customer_service' THEN 3 ELSE 4 END")
             ->orderByDesc('is_active')
             ->orderBy('name')
             ->withAvg('mechanicRatings', 'rating')

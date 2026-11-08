@@ -51,12 +51,12 @@ class StaffRoleTest extends TestCase
         // route => status untuk owner, admin, mekanik, customer
         return [
             'dashboard admin' => ['admin.dashboard', 200, 200, 403, 403],
-            'kelola staf' => ['admin.staff.index', 200, 403, 403, 403],
-            'tambah staf' => ['admin.staff.create', 200, 403, 403, 403],
-            // v1.14.0: Admin Dealer mengelola merek & kategori (Owner hanya lihat sesuai matriks).
-            'daftar merek' => ['admin.brands.index', 200, 200, 403, 403],
+            'kelola staf' => ['admin.staff.index', 200, 200, 403, 403],
+            'tambah staf' => ['admin.staff.create', 200, 200, 403, 403],
+            // Owner hanya dashboard, notifikasi, laporan, staf, pengaturan (merek & kategori 403).
+            'daftar merek' => ['admin.brands.index', 403, 200, 403, 403],
             'tambah merek' => ['admin.brands.create', 403, 200, 403, 403],
-            'daftar kategori' => ['admin.categories.index', 200, 200, 403, 403],
+            'daftar kategori' => ['admin.categories.index', 403, 200, 403, 403],
             'tambah kategori' => ['admin.categories.create', 403, 200, 403, 403],
             'laporan' => ['admin.reports.index', 200, 200, 403, 403],
             'pekerjaan mekanik' => ['mechanic.jobs.index', 403, 403, 200, 403],
@@ -144,7 +144,7 @@ class StaffRoleTest extends TestCase
             ->assertSee(route('admin.staff.index'), false)
             ->assertSee('Pak Hendra (Owner)');
 
-        $this->actingAs($this->admin)->get(route('admin.dashboard'))->assertDontSee(route('admin.staff.index'), false);
+        $this->actingAs($this->admin)->get(route('admin.dashboard'))->assertSee(route('admin.staff.index'), false);
 
         $this->actingAs($this->mechanic)->get(route('mechanic.jobs.index'))
             ->assertSee('Pekerjaan Saya')
@@ -197,13 +197,12 @@ class StaffRoleTest extends TestCase
         $this->assertSame(4, User::count());
     }
 
-    public function test_admin_dan_mekanik_tidak_bisa_mengelola_staf(): void
+    public function test_mekanik_tidak_bisa_mengelola_staf(): void
     {
         $payload = ['name' => 'Penyusup', 'email' => 'x@dealer.test', 'role' => 'admin', 'password' => 'rahasia123', 'password_confirmation' => 'rahasia123'];
 
-        $this->actingAs($this->admin)->post(route('admin.staff.store'), $payload)->assertForbidden();
-        $this->actingAs($this->admin)->put(route('admin.staff.update', $this->mechanic), $payload)->assertForbidden();
         $this->actingAs($this->mechanic)->post(route('admin.staff.store'), $payload)->assertForbidden();
+        $this->actingAs($this->mechanic)->put(route('admin.staff.update', $this->mechanic), $payload)->assertForbidden();
 
         $this->assertSame(4, User::count());
     }
