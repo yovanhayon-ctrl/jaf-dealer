@@ -7,19 +7,20 @@
 @endsection
 
 @section('content')
-    <div class="d-flex flex-column flex-sm-row gap-2 justify-content-between mb-3">
-        <form method="GET" action="{{ route('admin.brands.index') }}" class="d-flex gap-2 admin-search" role="search">
-            <input type="search" name="q" value="{{ $search }}" class="form-control" placeholder="Cari nama merek…" aria-label="Cari nama merek">
-            <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i><span class="d-none d-md-inline">Cari</span></button>
-            @if ($search !== '')
-                <a href="{{ route('admin.brands.index') }}" class="btn btn-outline-secondary">Reset</a>
-            @endif
-        </form>
-
-        <a href="{{ route('admin.brands.create') }}" class="btn btn-accent">
+    <x-admin.list-header :summary="number_format($brands->total(), 0, ',', '.').' merek'.($search !== '' ? ' ditemukan' : '')">
+        <a href="{{ route('admin.brands.create') }}" class="btn btn-accent btn-sm">
             <i class="bi bi-plus-lg"></i>Tambah Merek
         </a>
-    </div>
+    </x-admin.list-header>
+
+    <x-admin.filters :action="route('admin.brands.index')" :reset-url="route('admin.brands.index')"
+                     :active="$search !== '' ? 1 : 0" :show-reset="$search !== ''">
+        <div class="col-12 col-md-6 col-lg">
+            <label for="filter_q" class="form-label small mb-1">Cari merek</label>
+            <input type="search" id="filter_q" name="q" value="{{ $search }}" class="form-control form-control-sm"
+                   placeholder="Nama merek…" aria-label="Cari nama merek">
+        </div>
+    </x-admin.filters>
 
     <div class="card">
         @if ($brands->isEmpty())
@@ -35,10 +36,8 @@
                 <table class="table table-hover align-middle mb-0 admin-table">
                     <thead>
                         <tr>
-                            <th class="text-center" style="width: 60px">No</th>
-                            <th style="width: 72px">Logo</th>
-                            <th>Nama</th>
-                            <th>Slug</th>
+                            <th class="text-center" style="width: 50px">No</th>
+                            <th>Merek</th>
                             <th class="text-center">Jumlah Mobil</th>
                             <th class="text-end">Aksi</th>
                         </tr>
@@ -46,17 +45,29 @@
                     <tbody>
                         @foreach ($brands as $brand)
                             <tr>
-                                <td class="text-center text-muted">{{ $brands->firstItem() + $loop->index }}</td>
+                                <td class="text-center text-muted small">{{ $brands->firstItem() + $loop->index }}</td>
                                 <td>
-                                    @if ($brand->logo_url)
-                                        <img src="{{ $brand->logo_url }}" alt="Logo {{ $brand->name }}" class="admin-thumb">
+                                    <div class="d-flex align-items-center gap-3">
+                                        @if ($brand->logo_url)
+                                            <img src="{{ $brand->logo_url }}" alt="Logo {{ $brand->name }}" class="admin-thumb p-1 object-fit-contain flex-shrink-0">
+                                        @else
+                                            <span class="admin-thumb admin-thumb-empty flex-shrink-0"><i class="bi bi-image"></i></span>
+                                        @endif
+                                        <div class="min-w-0">
+                                            <div class="fw-semibold text-truncate">{{ $brand->name }}</div>
+                                            <div class="small text-muted font-monospace">{{ $brand->slug }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    @if ($brand->cars_count > 0)
+                                        <span class="badge bg-secondary-subtle text-secondary-emphasis fw-semibold">
+                                            {{ $brand->cars_count }} mobil
+                                        </span>
                                     @else
-                                        <span class="admin-thumb admin-thumb-empty"><i class="bi bi-image"></i></span>
+                                        <span class="text-muted small">0 mobil</span>
                                     @endif
                                 </td>
-                                <td class="fw-semibold">{{ $brand->name }}</td>
-                                <td class="text-muted small">{{ $brand->slug }}</td>
-                                <td class="text-center">{{ $brand->cars_count }}</td>
                                 <td class="text-end text-nowrap">
                                     @include('admin.partials.row-actions', [
                                         'editUrl' => route('admin.brands.edit', $brand),

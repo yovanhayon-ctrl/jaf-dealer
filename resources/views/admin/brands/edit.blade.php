@@ -6,12 +6,14 @@
     @include('partials.breadcrumb', ['items' => [
         ['label' => 'Merek', 'url' => route('admin.brands.index')],
         ['label' => $brand->name],
+        ['label' => 'Ubah'],
     ]])
 @endsection
 
 @section('content')
     <div class="card admin-form-card">
         <div class="card-body p-4">
+            <h2 class="h5 mb-4">Ubah Merek: {{ $brand->name }}</h2>
             <form method="POST" action="{{ route('admin.brands.update', $brand) }}" enctype="multipart/form-data" novalidate>
                 @method('PUT')
                 @include('admin.brands._form')
