@@ -23,71 +23,69 @@
         </div>
     </div>
 
-    {{-- Filter & Tombol Tambah --}}
-    <div class="card mb-3">
-        <div class="card-body p-3">
-            <form method="GET" action="{{ route('admin.spare-parts.index') }}" class="row g-2 align-items-end" role="search">
-                <div class="col-12 col-md-4 col-xl-3">
-                    <label for="filter_q" class="form-label small mb-1">Cari Spare Part</label>
-                    <input type="search" id="filter_q" name="q" value="{{ $filters['q'] }}" class="form-control form-control-sm"
-                           placeholder="Kode part, nama, kecocokan…">
-                </div>
+    @php
+        $activeFilters = collect($filters)->except('urut')->filter(fn ($value) => filled($value))->count();
+    @endphp
 
-                <div class="col-6 col-md-3 col-xl-2">
-                    <label for="filter_kategori" class="form-label small mb-1">Kategori</label>
-                    <select id="filter_kategori" name="kategori" class="form-select form-select-sm">
-                        <option value="">Semua Kategori</option>
-                        @foreach (\App\Models\SparePart::CATEGORIES as $key => $label)
-                            <option value="{{ $key }}" @selected($filters['kategori'] === $key)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </div>
+    {{-- Header ringkasan dan tombol Tambah --}}
+    <x-admin.list-header :summary="number_format($spareParts->total(), 0, ',', '.').' spare part'.($hasFilters ? ' ditemukan' : '')">
+        @can('spare-parts.manage')
+            <a href="{{ route('admin.spare-parts.create') }}" class="btn btn-accent btn-sm">
+                <i class="bi bi-plus-lg"></i>Tambah Spare Part
+            </a>
+        @endcan
+    </x-admin.list-header>
 
-                <div class="col-6 col-md-3 col-xl-2">
-                    <label for="filter_stok" class="form-label small mb-1">Status Stok</label>
-                    <select id="filter_stok" name="stok" class="form-select form-select-sm">
-                        <option value="">Semua Stok</option>
-                        <option value="tersedia" @selected($filters['stok'] === 'tersedia')>Tersedia (&gt; 0)</option>
-                        <option value="menipis" @selected($filters['stok'] === 'menipis')>Menipis (≤ Batas)</option>
-                        <option value="habis" @selected($filters['stok'] === 'habis')>Habis (0)</option>
-                    </select>
-                </div>
-
-                <div class="col-6 col-md-2 col-xl-2">
-                    <label for="filter_status" class="form-label small mb-1">Status</label>
-                    <select id="filter_status" name="status" class="form-select form-select-sm">
-                        <option value="">Semua</option>
-                        <option value="aktif" @selected($filters['status'] === 'aktif')>Aktif</option>
-                        <option value="nonaktif" @selected($filters['status'] === 'nonaktif')>Nonaktif</option>
-                    </select>
-                </div>
-
-                <div class="col-6 col-md-3 col-xl-2">
-                    <label for="filter_urut" class="form-label small mb-1">Urutan</label>
-                    <select id="filter_urut" name="urut" class="form-select form-select-sm">
-                        <option value="terbaru" @selected($filters['urut'] === 'terbaru')>Terbaru</option>
-                        <option value="nama_asc" @selected($filters['urut'] === 'nama_asc')>Nama (A–Z)</option>
-                        <option value="harga_termurah" @selected($filters['urut'] === 'harga_termurah')>Harga Termurah</option>
-                        <option value="harga_termahal" @selected($filters['urut'] === 'harga_termahal')>Harga Termahal</option>
-                        <option value="stok_tersedikit" @selected($filters['urut'] === 'stok_tersedikit')>Stok Tersedikit</option>
-                        <option value="stok_terbanyak" @selected($filters['urut'] === 'stok_terbanyak')>Stok Terbanyak</option>
-                    </select>
-                </div>
-
-                <div class="col-12 col-xl-auto d-flex gap-2 ms-xl-auto">
-                    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i>Terapkan</button>
-                    @if ($hasFilters)
-                        <a href="{{ route('admin.spare-parts.index') }}" class="btn btn-outline-secondary btn-sm">Reset</a>
-                    @endif
-                    @can('spare-parts.manage')
-                        <a href="{{ route('admin.spare-parts.create') }}" class="btn btn-accent btn-sm text-nowrap">
-                            <i class="bi bi-plus-lg"></i>Tambah Spare Part
-                        </a>
-                    @endcan
-                </div>
-            </form>
+    {{-- Filter Bar Standar Admin --}}
+    <x-admin.filters :action="route('admin.spare-parts.index')" :reset-url="route('admin.spare-parts.index')"
+                     :active="$activeFilters" :show-reset="$hasFilters || $filters['urut'] !== 'terbaru'">
+        <div class="col-12 col-md-4 col-lg">
+            <label for="filter_q" class="form-label small mb-1">Kata kunci</label>
+            <input type="search" id="filter_q" name="q" value="{{ $filters['q'] }}" class="form-control form-control-sm"
+                   placeholder="Kode part, nama, kecocokan…">
         </div>
-    </div>
+
+        <div class="col-6 col-md-3 col-lg-auto">
+            <label for="filter_kategori" class="form-label small mb-1">Kategori</label>
+            <select id="filter_kategori" name="kategori" class="form-select form-select-sm">
+                <option value="">Semua</option>
+                @foreach (\App\Models\SparePart::CATEGORIES as $key => $label)
+                    <option value="{{ $key }}" @selected($filters['kategori'] === $key)>{{ $label }}</option>
+                @endforeach
+            </select>
+        </div>
+
+        <div class="col-6 col-md-3 col-lg-auto">
+            <label for="filter_stok" class="form-label small mb-1">Status Stok</label>
+            <select id="filter_stok" name="stok" class="form-select form-select-sm">
+                <option value="">Semua</option>
+                <option value="tersedia" @selected($filters['stok'] === 'tersedia')>Tersedia (&gt; 0)</option>
+                <option value="menipis" @selected($filters['stok'] === 'menipis')>Menipis (≤ Batas)</option>
+                <option value="habis" @selected($filters['stok'] === 'habis')>Habis (0)</option>
+            </select>
+        </div>
+
+        <div class="col-6 col-md-3 col-lg-auto">
+            <label for="filter_status" class="form-label small mb-1">Status</label>
+            <select id="filter_status" name="status" class="form-select form-select-sm">
+                <option value="">Semua</option>
+                <option value="aktif" @selected($filters['status'] === 'aktif')>Aktif</option>
+                <option value="nonaktif" @selected($filters['status'] === 'nonaktif')>Nonaktif</option>
+            </select>
+        </div>
+
+        <div class="col-6 col-md-3 col-lg-auto">
+            <label for="filter_urut" class="form-label small mb-1">Urutan</label>
+            <select id="filter_urut" name="urut" class="form-select form-select-sm">
+                <option value="terbaru" @selected($filters['urut'] === 'terbaru')>Terbaru</option>
+                <option value="nama_asc" @selected($filters['urut'] === 'nama_asc')>Nama (A–Z)</option>
+                <option value="harga_termurah" @selected($filters['urut'] === 'harga_termurah')>Harga Termurah</option>
+                <option value="harga_termahal" @selected($filters['urut'] === 'harga_termahal')>Harga Termahal</option>
+                <option value="stok_tersedikit" @selected($filters['urut'] === 'stok_tersedikit')>Stok Tersedikit</option>
+                <option value="stok_terbanyak" @selected($filters['urut'] === 'stok_terbanyak')>Stok Terbanyak</option>
+            </select>
+        </div>
+    </x-admin.filters>
 
     {{-- Tabel Data Spare Part --}}
     <div class="card">
