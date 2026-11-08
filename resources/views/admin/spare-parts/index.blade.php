@@ -200,11 +200,7 @@
                 </table>
             </div>
 
-            @if ($spareParts->hasPages())
-                <div class="card-footer bg-transparent py-3">
-                    {{ $spareParts->links() }}
-                </div>
-            @endif
+            @include('admin.partials.pagination', ['paginator' => $spareParts])
         @endif
     </div>
 @endsection
