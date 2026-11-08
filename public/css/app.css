@@ -1922,6 +1922,9 @@ tr[data-row-link] {
     .admin-sticky-panel {
         position: sticky;
         top: 5.5rem;
+        max-height: calc(100vh - 6.5rem);
+        overflow-y: auto;
+        scrollbar-width: thin;
     }
 }
 
