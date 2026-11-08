@@ -94,7 +94,7 @@
         </div>
 
         <div class="col-xl-5">
-            <div class="d-flex flex-column gap-4">
+            <div class="admin-sticky-panel d-flex flex-column gap-4">
                 <div class="card">
                     <div class="card-body p-4">
                         <h3 class="admin-card-title">Status & Catatan Admin</h3>
