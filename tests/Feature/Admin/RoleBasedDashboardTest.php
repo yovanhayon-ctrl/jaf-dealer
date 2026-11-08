@@ -261,13 +261,12 @@ class RoleBasedDashboardTest extends TestCase
             ->assertSee('Rp 200.000.000');
     }
 
-    public function test_akses_pengaturan_hanya_owner(): void
+    public function test_akses_pengaturan_owner_dan_admin(): void
     {
         $this->actingAs($this->owner)->get(route('admin.settings.edit'))->assertOk();
+        $this->actingAs($this->admin)->get(route('admin.settings.edit'))->assertOk();
 
-        // Super Admin & Admin Dealer ditolak (403)
-        $this->actingAs($this->superAdmin)->get(route('admin.settings.edit'))->assertForbidden();
-        $this->actingAs($this->admin)->get(route('admin.settings.edit'))->assertForbidden();
+        // Sales dan CS ditolak (403)
         $this->actingAs($this->sales1)->get(route('admin.settings.edit'))->assertForbidden();
         $this->actingAs($this->customerService)->get(route('admin.settings.edit'))->assertForbidden();
     }

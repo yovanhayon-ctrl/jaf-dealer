@@ -75,7 +75,7 @@ class RolePermissionTest extends TestCase
             'pengguna' => ['admin.users.index', ['admin', 'customer_service']],
             'laporan' => ['admin.reports.index', ['owner', 'admin']],
             'staf' => ['admin.staff.index', ['admin']],
-            'pengaturan' => ['admin.settings.edit', ['owner']],
+            'pengaturan' => ['admin.settings.edit', ['owner', 'admin']],
             'pekerjaan mekanik' => ['mechanic.jobs.index', ['mechanic']],
             'layanan mekanik' => ['mechanic.services.index', ['mechanic']],
             'notifikasi mekanik' => ['mechanic.notifications.index', ['mechanic']],
@@ -137,7 +137,7 @@ class RolePermissionTest extends TestCase
             ->assertDontSee('href="'.route('admin.testimonials.index').'"', false)
             ->assertDontSee('href="'.route('admin.users.index').'"', false);
 
-        // Admin melihat seluruh menu operasional + Laporan & Staf, tetapi TIDAK melihat Pengaturan
+        // Admin melihat seluruh menu operasional + Laporan & Staf & Pengaturan
         $this->actingAs($this->users['admin'])->get(route('admin.dashboard'))
             ->assertSee('href="'.route('admin.cars.index').'"', false)
             ->assertSee('href="'.route('admin.brands.index').'"', false)
@@ -151,7 +151,7 @@ class RolePermissionTest extends TestCase
             ->assertSee('href="'.route('admin.users.index').'"', false)
             ->assertSee('href="'.route('admin.reports.index').'"', false)
             ->assertSee('href="'.route('admin.staff.index').'"', false)
-            ->assertDontSee('href="'.route('admin.settings.edit').'"', false);
+            ->assertSee('href="'.route('admin.settings.edit').'"', false);
 
         $this->actingAs($this->users['sales'])->get(route('admin.dashboard'))
             ->assertSee('href="'.route('admin.cars.index').'"', false)
@@ -255,7 +255,7 @@ class RolePermissionTest extends TestCase
         $this->patch(route('admin.testimonials.approve', $testimonial))->assertForbidden();
     }
 
-    public function test_admin_mengelola_operasional_tetapi_tanpa_pengaturan(): void
+    public function test_admin_mengelola_operasional_dan_pengaturan(): void
     {
         $admin = $this->users['admin'];
         $purchase = PurchaseRequest::factory()->status('approved')->create();
@@ -280,8 +280,8 @@ class RolePermissionTest extends TestCase
         // Laporan: Admin boleh melihat laporan operasional (tanpa rupiah)
         $this->get(route('admin.reports.index'))->assertOk();
 
-        // Pengaturan: Admin TIDAK boleh mengakses (403 khusus Owner)
-        $this->get(route('admin.settings.edit'))->assertForbidden();
+        // Pengaturan: Admin boleh mengakses pengaturan
+        $this->get(route('admin.settings.edit'))->assertOk();
 
         // Staf: Admin boleh kelola staf
         $this->get(route('admin.staff.index'))->assertOk();

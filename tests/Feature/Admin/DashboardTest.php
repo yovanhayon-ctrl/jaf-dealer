@@ -142,8 +142,8 @@ class DashboardTest extends TestCase
             ->assertSee('href="'.route('admin.purchase-requests.index').'"', false)
             ->assertSee('href="'.route('admin.reports.index').'"', false)
             ->assertSee('href="'.route('admin.staff.index').'"', false)
-            ->assertDontSee('href="'.route('admin.settings.edit').'"', false)
-            ->assertSeeInOrder(['Dashboard', 'Notifikasi', 'Mobil', 'Merek', 'Kategori', 'Promo', 'Test Drive', 'Pengajuan', 'Booking Servis', 'Layanan Servis', 'Ulasan', 'Pengguna', 'Laporan', 'Staf']);
+            ->assertSee('href="'.route('admin.settings.edit').'"', false)
+            ->assertSeeInOrder(['Dashboard', 'Notifikasi', 'Mobil', 'Merek', 'Kategori', 'Promo', 'Test Drive', 'Pengajuan', 'Booking Servis', 'Layanan Servis', 'Ulasan', 'Pengguna', 'Laporan', 'Staf', 'Pengaturan']);
 
         // Owner hanya melihat Dashboard, Laporan, Pengaturan (tidak ada Notifikasi dan Staf).
         $this->actingAs(User::factory()->owner()->create())->get('/admin/dashboard')

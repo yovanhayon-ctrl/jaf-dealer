@@ -99,7 +99,7 @@ class User extends Authenticatable
         'activity.view' => [self::ROLE_ADMIN],
         'reminders.send' => [self::ROLE_ADMIN, self::ROLE_CUSTOMER_SERVICE],
         'notifications.view' => [self::ROLE_ADMIN, self::ROLE_SALES, self::ROLE_CUSTOMER_SERVICE],
-        'settings.manage' => [self::ROLE_OWNER],
+        'settings.manage' => [self::ROLE_OWNER, self::ROLE_ADMIN],
         'backup.manage' => [self::ROLE_OWNER],
     ];
 

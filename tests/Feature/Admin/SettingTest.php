@@ -66,9 +66,9 @@ class SettingTest extends TestCase
             ->assertDontSee('Kosongkan untuk kembali ke bawaan')
             ->assertSee('href="'.route('admin.settings.edit').'"', false);
 
-        $this->actingAs(User::factory()->superAdmin()->create())->get(route('admin.settings.edit'))->assertForbidden();
-        $this->actingAs(User::factory()->admin()->create())->get(route('admin.settings.edit'))->assertForbidden();
-        $this->actingAs(User::factory()->admin()->create())->put(route('admin.settings.update'), $this->form())->assertForbidden();
+        $this->actingAs(User::factory()->admin()->create())->get(route('admin.settings.edit'))->assertOk();
+        $this->actingAs(User::factory()->sales()->create())->get(route('admin.settings.edit'))->assertForbidden();
+        $this->actingAs(User::factory()->sales()->create())->put(route('admin.settings.update'), $this->form())->assertForbidden();
     }
 
     public function test_nilai_sama_dengan_bawaan_tidak_disimpan(): void
