@@ -70,6 +70,15 @@ class AdminReportSections
             }
         }
 
+        $salesByStaff = $this->report->salesByStaff();
+        if ($canSeeRevenue) {
+            $sections[] = self::section('Penjualan per Sales', ['Sales', 'Unit', 'Nilai (Rp)'], ['text', 'number', 'rupiah'],
+                $salesByStaff->map(fn ($item) => self::row([$item->name, $item->units, $item->value]))->values()->all());
+        } else {
+            $sections[] = self::section('Penjualan per Sales', ['Sales', 'Unit'], ['text', 'number'],
+                $salesByStaff->map(fn ($item) => self::row([$item->name, $item->units]))->values()->all());
+        }
+
         if ($canSeeRevenue) {
             $sections[] = self::section('5 Mobil Terlaris', ['Peringkat', 'Mobil', 'Unit', 'Nilai (Rp)'], ['rank', 'text', 'number', 'rupiah'],
                 $this->report->topCars()->values()->map(fn ($car, $index) => self::row([$index + 1, $car->name, $car->units, $car->value]))->all());
@@ -96,6 +105,14 @@ class AdminReportSections
 
         $sections[] = self::section('Layanan Servis Terpopuler', ['Layanan', 'Booking', 'Selesai'], ['text', 'number', 'number'],
             $this->report->servicesByPopularity()->map(fn ($service) => self::row([$service->name, $service->total, $service->completed]))->values()->all());
+
+        $sections[] = self::section('Kinerja Mekanik', ['Mekanik', 'Servis Selesai', 'Ulasan', 'Rata-rata Rating'], ['text', 'number', 'number', 'text'],
+            $this->report->mechanicPerformance()->map(fn ($m) => self::row([
+                $m->name,
+                $m->completed,
+                $m->reviews_count,
+                $m->avg_rating !== null ? number_format($m->avg_rating, 1, ',', '.') : '-',
+            ]))->values()->all());
 
         $sections[] = self::section('Stok Menipis (mobil aktif, stok maksimal '.Car::LOW_STOCK_THRESHOLD.')', ['Mobil', 'Kondisi', 'Stok'], ['text', 'text', 'number'],
             $this->report->lowStockCars()->map(fn ($car) => self::row(["{$car->brand->name} {$car->name} {$car->year}", $car->condition_label, $car->stock]))->values()->all());

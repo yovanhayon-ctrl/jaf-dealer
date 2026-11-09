@@ -15,6 +15,8 @@
     $popularServices = $report->servicesByPopularity();
     $byBrand = $report->salesByBrand();
     $byCategory = $report->salesByCategory();
+    $bySales = $report->salesByStaff();
+    $mechanics = $report->mechanicPerformance();
     $topCars = $report->topCars();
     $lowStock = $report->lowStockCars();
     $rupiah = fn (int $amount) => 'Rp '.number_format($amount, 0, ',', '.');
@@ -217,6 +219,46 @@
     <div class="row g-4 mb-4">
         <div class="col-lg-6">
             <div class="card h-100 report-card">
+                <div class="card-header bg-transparent border-0 pt-3 px-3"><h3 class="h6 mb-0">Penjualan per Sales</h3></div>
+                @if ($bySales->isEmpty())
+                    <x-empty-state icon="bi-person-badge" title="Belum ada penjualan" message="Tidak ada unit terjual pada periode ini." />
+                @else
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0 admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Sales</th>
+                                    <th class="text-center">Unit</th>
+                                    @can('reports.revenue')
+                                        <th class="text-end">Nilai</th>
+                                        <th style="width: 30%">Porsi nilai</th>
+                                    @endcan
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($bySales as $row)
+                                    @php($share = AdminReport::percent($row->value, $purchases['sales_value']))
+                                    <tr>
+                                        <td>{{ $row->name }}</td>
+                                        <td class="text-center">{{ $row->units }}</td>
+                                        @can('reports.revenue')
+                                            <td class="text-end"><x-price :amount="$row->value" /></td>
+                                            <td>
+                                                @include('admin.reports._bar', ['value' => $share])
+                                                <div class="small text-muted">{{ $percentLabel($share) }}</div>
+                                            </td>
+                                        @endcan
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card h-100 report-card">
                 <div class="card-header bg-transparent border-0 pt-3 px-3"><h3 class="h6 mb-0">5 Mobil Terlaris</h3></div>
                 @if ($topCars->isEmpty())
                     <x-empty-state icon="bi-trophy" title="Belum ada penjualan" message="Tidak ada unit terjual pada periode ini." />
@@ -250,7 +292,9 @@
                 @endif
             </div>
         </div>
+    </div>
 
+    <div class="row g-4 mb-4">
         <div class="col-lg-6">
             <div class="card h-100 report-card">
                 <div class="card-header bg-transparent border-0 pt-3 px-3 d-flex justify-content-between align-items-center">
@@ -285,9 +329,7 @@
                 @endif
             </div>
         </div>
-    </div>
 
-    <div class="row g-4 mb-4">
         <div class="col-lg-6">
             <div class="card h-100 report-card">
                 <div class="card-header bg-transparent border-0 pt-3 px-3 d-flex justify-content-between align-items-center">
@@ -322,7 +364,9 @@
                 @endif
             </div>
         </div>
+    </div>
 
+    <div class="row g-4 mb-4">
         <div class="col-lg-6">
             <div class="card h-100 report-card">
                 <div class="card-header bg-transparent border-0 pt-3 px-3"><h3 class="h6 mb-0">Layanan Servis Terpopuler</h3></div>
@@ -346,6 +390,50 @@
                                         <td>{{ $service->name }}</td>
                                         <td class="text-center">{{ $service->total }}</td>
                                         <td class="text-center">{{ $service->completed }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card h-100 report-card">
+                <div class="card-header bg-transparent border-0 pt-3 px-3 d-flex justify-content-between align-items-center">
+                    <h3 class="h6 mb-0">Kinerja Mekanik & Rating</h3>
+                    <span class="small text-muted">{{ $mechanics->count() }} mekanik</span>
+                </div>
+                @if ($mechanics->isEmpty())
+                    <x-empty-state icon="bi-wrench" title="Belum ada servis selesai" message="Tidak ada pengerjaan servis selesai pada periode ini." />
+                @else
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0 admin-table">
+                            <thead>
+                                <tr>
+                                    <th class="text-center" style="width: 50px">#</th>
+                                    <th>Mekanik</th>
+                                    <th class="text-center">Selesai</th>
+                                    <th class="text-center">Ulasan</th>
+                                    <th class="text-end">Rating</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($mechanics as $mechanic)
+                                    <tr>
+                                        <td class="text-center text-muted">{{ $loop->iteration }}</td>
+                                        <td>{{ $mechanic->name }}</td>
+                                        <td class="text-center">{{ $mechanic->completed }}</td>
+                                        <td class="text-center">{{ $mechanic->reviews_count }}</td>
+                                        <td class="text-end">
+                                            @if ($mechanic->avg_rating !== null)
+                                                <span class="text-warning"><i class="bi bi-star-fill"></i></span>
+                                                <span class="fw-semibold">{{ number_format($mechanic->avg_rating, 1, ',', '.') }}</span>
+                                            @else
+                                                <span class="text-muted">-</span>
+                                            @endif
+                                        </td>
                                     </tr>
                                 @endforeach
                             </tbody>

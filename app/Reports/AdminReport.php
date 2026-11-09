@@ -50,6 +50,28 @@ class AdminReport
     }
 
     /**
+     * Penjualan mobil per staf sales dalam periode (hanya unit terjual).
+     *
+     * @return Collection<int, object{name: string, units: int, value: int}>
+     */
+    public function salesByStaff(): Collection
+    {
+        return $this->memo[__FUNCTION__] ??= $this->soldQuery()
+            ->leftJoin('users as sales', 'sales.id', '=', 'purchase_requests.sales_id')
+            ->groupBy('purchase_requests.sales_id', 'sales.name')
+            ->selectRaw("COALESCE(sales.name, 'Tanpa Sales / Online') AS name, COUNT(*) AS units, SUM(purchase_requests.car_price) AS value")
+            ->orderByDesc('units')
+            ->orderByDesc('value')
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($row) => (object) [
+                'name' => (string) $row->name,
+                'units' => (int) $row->units,
+                'value' => (int) $row->value,
+            ]);
+    }
+
+    /**
      * @return Collection<int, object{id: int, name: string, units: int, value: int}>
      */
     public function topCars(int $limit = 5): Collection
@@ -116,6 +138,35 @@ class AdminReport
             ->orderBy('services.name')
             ->get()
             ->map(fn ($row) => (object) ['name' => $row->name, 'total' => (int) $row->total, 'completed' => (int) $row->completed]);
+    }
+
+    /**
+     * Kinerja mekanik: servis selesai, jumlah ulasan, dan rata-rata rating dalam periode.
+     *
+     * @return Collection<int, object{name: string, completed: int, reviews_count: int, avg_rating: ?float}>
+     */
+    public function mechanicPerformance(): Collection
+    {
+        return $this->memo[__FUNCTION__] ??= DB::table('service_bookings')
+            ->where('service_bookings.status', ServiceBooking::STATUS_COMPLETED)
+            ->whereBetween('service_bookings.preferred_date', [$this->period->from->toDateTimeString(), $this->period->to->toDateTimeString()])
+            ->leftJoin('users as mechanics', 'mechanics.id', '=', 'service_bookings.mechanic_id')
+            ->leftJoin('mechanic_ratings', 'mechanic_ratings.service_booking_id', '=', 'service_bookings.id')
+            ->groupBy('service_bookings.mechanic_id', 'mechanics.name')
+            ->selectRaw("COALESCE(mechanics.name, 'Belum Ditugaskan') AS name")
+            ->selectRaw('COUNT(DISTINCT service_bookings.id) AS completed')
+            ->selectRaw('COUNT(mechanic_ratings.id) AS reviews_count')
+            ->selectRaw('AVG(mechanic_ratings.rating) AS avg_rating')
+            ->orderByDesc('completed')
+            ->orderByDesc('avg_rating')
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($row) => (object) [
+                'name' => (string) $row->name,
+                'completed' => (int) $row->completed,
+                'reviews_count' => (int) $row->reviews_count,
+                'avg_rating' => $row->avg_rating !== null ? round((float) $row->avg_rating, 1) : null,
+            ]);
     }
 
     /**
