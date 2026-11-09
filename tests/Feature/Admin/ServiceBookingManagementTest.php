@@ -290,4 +290,53 @@ class ServiceBookingManagementTest extends TestCase
         $this->actingAs($this->admin)->get(route('admin.service-bookings.show', $booking))
             ->assertSee('data-note-templates=\''.json_encode($booking->noteTemplates()).'\'', false);
     }
+
+    public function test_admin_bisa_mencentang_dan_melewati_pekerjaan_checklist(): void
+    {
+        $mechanic = User::factory()->mechanic()->create(['name' => 'Bambang']);
+        $booking = $this->makeBooking(['status' => 'confirmed', 'mechanic_id' => $mechanic->id]);
+        $task = $booking->tasks()->create(['name' => 'Cek Oli Mesin', 'position' => 1]);
+
+        // Tandai selesai
+        $this->actingAs($this->admin)
+            ->patch(route('admin.service-bookings.tasks.update', [$booking, $task]), ['status' => 'done'])
+            ->assertRedirect(route('admin.service-bookings.show', $booking).'#pekerjaan')
+            ->assertSessionHas('success');
+
+        $this->assertTrue($task->fresh()->isDone());
+        $this->assertNotNull($task->fresh()->checked_at);
+
+        // Lewati pekerjaan dengan catatan
+        $this->actingAs($this->admin)
+            ->patch(route('admin.service-bookings.tasks.update', [$booking, $task]), [
+                'status' => 'skipped',
+                'note' => 'Filter oli masih baru',
+            ])
+            ->assertSessionHas('success');
+
+        $this->assertTrue($task->fresh()->isSkipped());
+        $this->assertSame('Filter oli masih baru', $task->fresh()->note);
+
+        // Batalkan centang kembali ke pending
+        $this->actingAs($this->admin)
+            ->patch(route('admin.service-bookings.tasks.update', [$booking, $task]), ['status' => 'pending'])
+            ->assertSessionHas('success');
+
+        $this->assertTrue($task->fresh()->isPending());
+    }
+
+    public function test_admin_bisa_mengisi_dan_mengubah_temuan_dan_rekomendasi(): void
+    {
+        $mechanic = User::factory()->mechanic()->create();
+        $booking = $this->makeBooking(['status' => 'in_progress', 'mechanic_id' => $mechanic->id]);
+
+        $this->actingAs($this->admin)
+            ->patch(route('admin.service-bookings.findings', $booking), [
+                'findings' => 'Kampas rem depan menipis, disarankan ganti dalam 1.000 km.',
+            ])
+            ->assertRedirect(route('admin.service-bookings.show', $booking).'#pekerjaan')
+            ->assertSessionHas('success', 'Temuan & rekomendasi disimpan.');
+
+        $this->assertSame('Kampas rem depan menipis, disarankan ganti dalam 1.000 km.', $booking->fresh()->findings);
+    }
 }

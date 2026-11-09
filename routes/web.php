@@ -314,8 +314,10 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::patch('{serviceBooking}/status', 'updateStatus')->middleware('can:service-bookings.manage')->name('update-status');
         Route::patch('{serviceBooking}/jadwal', 'reschedule')->middleware('can:service-bookings.manage')->name('reschedule');
         Route::patch('{serviceBooking}/mekanik', 'assignMechanic')->middleware('can:service-bookings.manage')->name('assign-mechanic');
+        Route::patch('{serviceBooking}/pekerjaan/{task}', 'updateTask')->middleware('can:service-bookings.manage')->scopeBindings()->name('tasks.update');
         Route::post('{serviceBooking}/pekerjaan', 'addTask')->middleware('can:service-bookings.manage')->name('tasks.store');
         Route::delete('{serviceBooking}/pekerjaan/{task}', 'removeTask')->middleware('can:service-bookings.manage')->scopeBindings()->name('tasks.destroy');
+        Route::patch('{serviceBooking}/temuan', 'updateFindings')->middleware('can:service-bookings.manage')->name('findings');
     });
 
     // Moderasi ulasan customer (tampil di beranda setelah disetujui).

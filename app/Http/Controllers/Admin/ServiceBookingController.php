@@ -171,6 +171,45 @@ class ServiceBookingController extends Controller
     }
 
     /**
+     * Admin centang / ubah status butir pekerjaan checklist (selesai, dilewati, belum).
+     */
+    public function updateTask(Request $request, ServiceBooking $serviceBooking, ServiceBookingTask $task): RedirectResponse
+    {
+        $validated = $request->validateWithBag("task{$task->id}", [
+            'status' => ['required', Rule::in(ServiceBookingTask::STATUSES)],
+            'note' => ['nullable', 'string', 'max:'.ServiceBookingTask::MAX_NOTE_LENGTH],
+        ], [], ['note' => 'alasan']);
+
+        $redirect = $this->backToWork($serviceBooking);
+
+        if (! in_array($serviceBooking->status, [ServiceBooking::STATUS_CONFIRMED, ServiceBooking::STATUS_IN_PROGRESS, ServiceBooking::STATUS_COMPLETED], true)) {
+            return $redirect->with('error', 'Pekerjaan tidak bisa diubah pada status ini.');
+        }
+
+        $task->update([
+            'status' => $validated['status'],
+            'note' => $validated['status'] === ServiceBookingTask::STATUS_SKIPPED ? ($validated['note'] ?: 'Dilewati oleh admin') : null,
+            'checked_at' => $validated['status'] === ServiceBookingTask::STATUS_PENDING ? null : now(),
+        ]);
+
+        return $redirect->with('success', "Status pekerjaan \"{$task->name}\" diperbarui.");
+    }
+
+    /**
+     * Admin simpan / ubah temuan & rekomendasi teknis untuk customer.
+     */
+    public function updateFindings(Request $request, ServiceBooking $serviceBooking): RedirectResponse
+    {
+        $validated = $request->validateWithBag('findings', [
+            'findings' => ['nullable', 'string', 'max:'.ServiceBooking::MAX_FINDINGS_LENGTH],
+        ], [], ['findings' => 'temuan & rekomendasi']);
+
+        $serviceBooking->update(['findings' => trim((string) $validated['findings']) ?: null]);
+
+        return $this->backToWork($serviceBooking)->with('success', 'Temuan & rekomendasi disimpan.');
+    }
+
+    /**
      * Jadwal ulang (status menjadi Dikonfirmasi, customer diberi tahu). Lihat RescheduleBooking.
      */
     public function reschedule(RescheduleRequest $request, ServiceBooking $serviceBooking, RescheduleBooking $reschedule): RedirectResponse
