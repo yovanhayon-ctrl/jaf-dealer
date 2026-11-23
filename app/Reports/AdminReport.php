@@ -5,6 +5,7 @@ namespace App\Reports;
 use App\Models\Car;
 use App\Models\PurchaseRequest;
 use App\Models\ServiceBooking;
+use App\Models\SparePart;
 use App\Models\TestDrive;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Query\Builder;
@@ -50,6 +51,28 @@ class AdminReport
     }
 
     /**
+     * Penjualan mobil per staf sales dalam periode (hanya unit terjual).
+     *
+     * @return Collection<int, object{name: string, units: int, value: int}>
+     */
+    public function salesByStaff(): Collection
+    {
+        return $this->memo[__FUNCTION__] ??= $this->soldQuery()
+            ->leftJoin('users as sales', 'sales.id', '=', 'purchase_requests.sales_id')
+            ->groupBy('purchase_requests.sales_id', 'sales.name')
+            ->selectRaw("COALESCE(sales.name, 'Tanpa Sales / Online') AS name, COUNT(*) AS units, SUM(purchase_requests.car_price) AS value")
+            ->orderByDesc('units')
+            ->orderByDesc('value')
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($row) => (object) [
+                'name' => (string) $row->name,
+                'units' => (int) $row->units,
+                'value' => (int) $row->value,
+            ]);
+    }
+
+    /**
      * @return Collection<int, object{id: int, name: string, units: int, value: int}>
      */
     public function topCars(int $limit = 5): Collection
@@ -89,6 +112,66 @@ class AdminReport
     }
 
     /**
+     * Total pendapatan servis yang selesai dalam periode ini (rupiah): jasa servis + suku cadang terpasang.
+     */
+    public function serviceRevenue(): int
+    {
+        return $this->memo[__FUNCTION__] ??= (int) (
+            $this->serviceLaborRevenue() + $this->serviceSparePartsRevenue()
+        );
+    }
+
+    /**
+     * Pendapatan jasa servis murni (tanpa suku cadang) untuk booking yang selesai dalam periode ini.
+     */
+    public function serviceLaborRevenue(): int
+    {
+        return $this->memo[__FUNCTION__] ??= (int) DB::table('service_bookings')
+            ->where('status', ServiceBooking::STATUS_COMPLETED)
+            ->whereBetween('preferred_date', [$this->period->from->toDateTimeString(), $this->period->to->toDateTimeString()])
+            ->sum(DB::raw('COALESCE(service_price, 0)'));
+    }
+
+    /**
+     * Pendapatan pergantian suku cadang pada booking servis yang selesai dalam periode ini.
+     */
+    public function serviceSparePartsRevenue(): int
+    {
+        return $this->memo[__FUNCTION__] ??= (int) DB::table('service_booking_spare_parts')
+            ->join('service_bookings', 'service_bookings.id', '=', 'service_booking_spare_parts.service_booking_id')
+            ->where('service_bookings.status', ServiceBooking::STATUS_COMPLETED)
+            ->whereBetween('service_bookings.preferred_date', [$this->period->from->toDateTimeString(), $this->period->to->toDateTimeString()])
+            ->sum(DB::raw('COALESCE(service_booking_spare_parts.subtotal, 0)'));
+    }
+
+    /**
+     * Suku cadang terpopuler yang diganti di bengkel (hanya booking servis selesai dalam periode).
+     *
+     * @return Collection<int, object{part_name: string, part_number: string, units: int, value: int}>
+     */
+    public function topSpareParts(int $limit = 5): Collection
+    {
+        return $this->memo[__FUNCTION__.$limit] ??= DB::table('service_booking_spare_parts')
+            ->join('service_bookings', 'service_bookings.id', '=', 'service_booking_spare_parts.service_booking_id')
+            ->where('service_bookings.status', ServiceBooking::STATUS_COMPLETED)
+            ->whereBetween('service_bookings.preferred_date', [$this->period->from->toDateTimeString(), $this->period->to->toDateTimeString()])
+            ->groupBy('service_booking_spare_parts.part_name', 'service_booking_spare_parts.part_number')
+            ->selectRaw('service_booking_spare_parts.part_name, service_booking_spare_parts.part_number')
+            ->selectRaw('SUM(service_booking_spare_parts.quantity) AS units')
+            ->selectRaw('SUM(service_booking_spare_parts.subtotal) AS value')
+            ->orderByDesc('units')
+            ->orderByDesc('value')
+            ->limit($limit)
+            ->get()
+            ->map(fn ($row) => (object) [
+                'part_name' => (string) $row->part_name,
+                'part_number' => (string) $row->part_number,
+                'units' => (int) $row->units,
+                'value' => (int) $row->value,
+            ]);
+    }
+
+    /**
      * Jumlah booking servis per layanan (semua status) dan yang selesai, urut terbanyak.
      *
      * @return Collection<int, object{name: string, total: int, completed: int}>
@@ -108,6 +191,35 @@ class AdminReport
     }
 
     /**
+     * Kinerja mekanik: servis selesai, jumlah ulasan, dan rata-rata rating dalam periode.
+     *
+     * @return Collection<int, object{name: string, completed: int, reviews_count: int, avg_rating: ?float}>
+     */
+    public function mechanicPerformance(): Collection
+    {
+        return $this->memo[__FUNCTION__] ??= DB::table('service_bookings')
+            ->where('service_bookings.status', ServiceBooking::STATUS_COMPLETED)
+            ->whereBetween('service_bookings.preferred_date', [$this->period->from->toDateTimeString(), $this->period->to->toDateTimeString()])
+            ->leftJoin('users as mechanics', 'mechanics.id', '=', 'service_bookings.mechanic_id')
+            ->leftJoin('mechanic_ratings', 'mechanic_ratings.service_booking_id', '=', 'service_bookings.id')
+            ->groupBy('service_bookings.mechanic_id', 'mechanics.name')
+            ->selectRaw("COALESCE(mechanics.name, 'Belum Ditugaskan') AS name")
+            ->selectRaw('COUNT(DISTINCT service_bookings.id) AS completed')
+            ->selectRaw('COUNT(mechanic_ratings.id) AS reviews_count')
+            ->selectRaw('AVG(mechanic_ratings.rating) AS avg_rating')
+            ->orderByDesc('completed')
+            ->orderByDesc('avg_rating')
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($row) => (object) [
+                'name' => (string) $row->name,
+                'completed' => (int) $row->completed,
+                'reviews_count' => (int) $row->reviews_count,
+                'avg_rating' => $row->avg_rating !== null ? round((float) $row->avg_rating, 1) : null,
+            ]);
+    }
+
+    /**
      * Mobil aktif dengan stok ≤ Car::LOW_STOCK_THRESHOLD (tidak bergantung periode).
      *
      * @return EloquentCollection<int, Car>
@@ -120,6 +232,20 @@ class AdminReport
             ->orderBy('stock')
             ->orderBy('name')
             ->get(['id', 'brand_id', 'name', 'year', 'vehicle_condition', 'stock']);
+    }
+
+    /**
+     * Suku cadang aktif dengan stok menipis (stock <= min_stock) (tidak bergantung periode).
+     *
+     * @return EloquentCollection<int, SparePart>
+     */
+    public function lowStockSpareParts(): EloquentCollection
+    {
+        return $this->memo[__FUNCTION__] ??= SparePart::active()
+            ->whereColumn('stock', '<=', 'min_stock')
+            ->orderBy('stock')
+            ->orderBy('name')
+            ->get(['id', 'part_number', 'name', 'category', 'stock', 'min_stock', 'unit']);
     }
 
     /**

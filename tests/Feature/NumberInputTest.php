@@ -125,7 +125,7 @@ class NumberInputTest extends TestCase
         $this->assertRejected($this->postPurchase(['phone' => $phone]), 'phone', $message);
         $this->assertRejected($this->bookService(['phone' => $phone]), 'phone', $message);
         $this->assertRejected($this->actingAs($this->customer)->post(route('test-drives.store'), [
-            'car_id' => Car::factory()->create()->id, 'preferred_date' => '2026-10-12', 'preferred_time' => '10:00', 'phone' => $phone,
+            'car_id' => Car::factory()->create()->id, 'preferred_date' => '2026-10-12', 'preferred_time' => '10:00', 'phone' => $phone, 'has_sim' => '1',
         ]), 'phone', $message);
         $this->assertRejected($this->actingAs($this->customer)->patch(route('account.profile.update'), [
             'name' => 'Budi', 'email' => $this->customer->email, 'phone' => $phone,

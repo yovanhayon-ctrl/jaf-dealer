@@ -31,8 +31,8 @@ class NotificationController extends Controller
                 ->all(),
             'hasUnread' => $request->user()->unreadNotifications()->exists(),
             'routePrefix' => 'mechanic.notifications',
-            'intro' => 'Pekerjaan servis baru yang ditugaskan kepada Anda.',
-            'emptyMessage' => 'Notifikasi muncul saat ada booking servis yang ditugaskan kepada Anda.',
+            'intro' => 'Pekerjaan servis yang ditugaskan kepada Anda atau telah selesai dikerjakan.',
+            'emptyMessage' => 'Notifikasi muncul saat ada booking servis yang ditugaskan atau telah diselesaikan.',
         ]);
     }
 

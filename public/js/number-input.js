@@ -41,6 +41,10 @@
         }
 
         var digits = value.replace(/\D/g, '');
+        if (type === 'thousands') {
+            // Hapus angka 0 di depan jika diikuti angka lain (misal "020000000" menjadi "20000000")
+            digits = digits.replace(/^0+(?=\d)/, '');
+        }
         var next = digits;
 
         if (type === 'thousands') {
@@ -77,6 +81,18 @@
         if (input.matches && input.matches('input[type="number"][data-number]')
             && event.key.length === 1 && !/\d/.test(event.key) && !event.ctrlKey && !event.metaKey) {
             event.preventDefault();
+        }
+    });
+
+    // Saat isian ribuan bernilai "0" difokuskan, pilih seluruh teks agar langsung terganti saat diketik.
+    document.addEventListener('focusin', function (event) {
+        var input = event.target;
+        if (input.matches && input.matches('input[data-number="thousands"]') && input.value === '0') {
+            setTimeout(function () {
+                if (document.activeElement === input) {
+                    input.select();
+                }
+            }, 10);
         }
     });
 

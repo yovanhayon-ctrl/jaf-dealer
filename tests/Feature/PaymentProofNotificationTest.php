@@ -57,7 +57,7 @@ class PaymentProofNotificationTest extends TestCase
         return $proof;
     }
 
-    public function test_bukti_baru_dikirim_ke_owner_dan_admin_aktif_saja(): void
+    public function test_bukti_baru_dikirim_ke_admin_aktif_saja(): void
     {
         $mechanic = User::factory()->mechanic()->create();
         $inactiveAdmin = User::factory()->admin()->inactive()->create();
@@ -67,22 +67,20 @@ class PaymentProofNotificationTest extends TestCase
             'file' => UploadedFile::fake()->image('bukti.jpg'),
         ])->assertSessionHasNoErrors();
 
-        foreach ([$this->admin, $this->owner] as $staff) {
-            $notification = $staff->notifications()->sole();
-            $this->assertSame(PaymentProofActivity::class, $notification->type);
-            $this->assertSame([
-                'title' => 'Bukti Pembayaran Baru · Fadlan',
-                'message' => 'Nissan Kicks e-Power VL 2025 · Cash · Tanda jadi Rp 5.000.000 (Transfer)',
-                'status' => PurchaseRequest::STATUS_APPROVED,
-                'admin_note' => null,
-                'route' => 'admin.purchase-requests.show',
-                'params' => [$this->cash->id],
-                'record' => ['type' => 'PurchaseRequest', 'id' => $this->cash->id],
-                'anchor' => 'bukti-pembayaran',
-            ], $notification->data);
-        }
+        $notification = $this->admin->notifications()->sole();
+        $this->assertSame(PaymentProofActivity::class, $notification->type);
+        $this->assertSame([
+            'title' => 'Bukti Pembayaran Baru · Fadlan',
+            'message' => 'Nissan Kicks e-Power VL 2025 · Cash · Tanda jadi Rp 5.000.000 (Transfer)',
+            'status' => PurchaseRequest::STATUS_APPROVED,
+            'admin_note' => null,
+            'route' => 'admin.purchase-requests.show',
+            'params' => [$this->cash->id],
+            'record' => ['type' => 'PurchaseRequest', 'id' => $this->cash->id],
+            'anchor' => 'bukti-pembayaran',
+        ], $notification->data);
 
-        foreach ([$mechanic, $inactiveAdmin, $this->customer] as $user) {
+        foreach ([$this->owner, $mechanic, $inactiveAdmin, $this->customer] as $user) {
             $this->assertSame(0, $user->notifications()->count());
         }
 

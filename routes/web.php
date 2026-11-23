@@ -25,6 +25,7 @@ use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\ServiceBookingController as AdminServiceBookingController;
 use App\Http\Controllers\Admin\ServiceController as AdminServiceController;
 use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Admin\SparePartController as AdminSparePartController;
 use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\Admin\TestDriveController as AdminTestDriveController;
 use App\Http\Controllers\Admin\TestimonialController as AdminTestimonialController;
@@ -41,12 +42,14 @@ use App\Http\Controllers\Mechanic\JobController as MechanicJobController;
 use App\Http\Controllers\Mechanic\NotificationController as MechanicNotificationController;
 use App\Http\Controllers\Mechanic\RatingController as MechanicRatingController;
 use App\Http\Controllers\Mechanic\ServiceController as MechanicServiceController;
+use App\Http\Controllers\NotificationCountController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\PromoController;
 use App\Http\Controllers\PurchaseRequestController;
 use App\Http\Controllers\SeoController;
 use App\Http\Controllers\ServiceBookingController;
 use App\Http\Controllers\ServiceController;
+use App\Http\Controllers\SparePartController;
 use App\Http\Controllers\TestDriveController;
 use Illuminate\Support\Facades\Route;
 
@@ -63,6 +66,8 @@ Route::get('/promo', [PromoController::class, 'index'])->name('promos.index');
 Route::get('/promo/{promo:slug}', [PromoController::class, 'show'])->name('promos.show');
 Route::get('/simulasi-kredit', [CreditSimulationController::class, 'index'])->name('credit.index');
 Route::get('/servis', [ServiceController::class, 'index'])->name('services.index');
+Route::get('/spare-part', [SparePartController::class, 'index'])->name('spare-parts.index');
+Route::get('/spare-part/{sparePart:slug}', [SparePartController::class, 'show'])->name('spare-parts.show');
 
 // Bandingkan mobil (pilihan di session, tamu boleh).
 Route::get('/bandingkan', [CompareController::class, 'index'])->name('compare.index');
@@ -182,6 +187,8 @@ Route::middleware('auth')->group(function () {
         Route::patch('notifikasi/baca-semua', [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
         Route::get('notifikasi/{notification}', [NotificationController::class, 'open'])->whereUuid('notification')->name('notifications.open');
     });
+
+    Route::get('notifikasi/unread-count', NotificationCountController::class)->name('notifications.unread-count');
 });
 
 /*
@@ -196,8 +203,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/pengingat', ReminderController::class)->middleware(['can:reminders.send', 'throttle:6,1'])->name('reminders.send');
 
     Route::controller(AdminNotificationController::class)->prefix('notifikasi')->name('notifications.')->group(function () {
-        Route::get('/', 'index')->name('index');
-        Route::patch('baca-semua', 'markAllAsRead')->name('read-all');
+        Route::get('/', 'index')->middleware('can:notifications.view')->name('index');
+        Route::patch('baca-semua', 'markAllAsRead')->middleware('can:notifications.view')->name('read-all');
         Route::get('{notification}', 'open')->whereUuid('notification')->name('open');
     });
 
@@ -212,6 +219,10 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
             Route::get('/', 'index')->name('index');
             Route::post('/', 'store')->name('store');
             Route::patch('{image}/utama', 'makePrimary')->name('primary');
+            Route::patch('{image}/warna', 'updateColor')->name('color');
+            Route::post('warna', 'storeColorPalette')->name('colors.store');
+            Route::patch('warna/stok', 'updateColorPaletteStock')->name('colors.stock');
+            Route::delete('warna/{index}', 'destroyColorPalette')->name('colors.destroy');
             Route::patch('{image}/{direction}', 'move')->whereIn('direction', ['naik', 'turun'])->name('move');
             Route::delete('{image}', 'destroy')->name('destroy');
         });
@@ -229,14 +240,16 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         ->except('show')
         ->parameters(['merek' => 'brand'])
         ->names('brands')
-        ->middleware('can:catalog.manage')
+        ->middleware('can:brands.view')
+        ->middlewareFor(['create', 'store', 'edit', 'update'], 'can:catalog.manage')
         ->middlewareFor('destroy', 'can:master.delete');
 
     Route::resource('kategori', CategoryController::class)
         ->except('show')
         ->parameters(['kategori' => 'category'])
         ->names('categories')
-        ->middleware('can:catalog.manage')
+        ->middleware('can:categories.view')
+        ->middlewareFor(['create', 'store', 'edit', 'update'], 'can:catalog.manage')
         ->middlewareFor('destroy', 'can:master.delete');
 
     Route::resource('promo', AdminPromoController::class)
@@ -253,6 +266,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::get('{testDrive}', 'show')->name('show');
         Route::patch('{testDrive}/status', 'updateStatus')->middleware('can:test-drives.manage')->name('update-status');
         Route::patch('{testDrive}/jadwal', 'reschedule')->middleware('can:test-drives.manage')->name('reschedule');
+        Route::patch('{testDrive}/sales', 'assignSales')->middleware('can:test-drives.manage')->name('assign-sales');
     });
 
     Route::controller(AdminPurchaseRequestController::class)->prefix('pengajuan')->name('purchase-requests.')->middleware('can:purchases.view')->group(function () {
@@ -260,6 +274,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::get('{purchaseRequest}', 'show')->name('show');
         Route::get('{purchaseRequest}/pdf', 'pdf')->middleware('throttle:20,1')->name('pdf');
         Route::patch('{purchaseRequest}/status', 'updateStatus')->middleware('can:purchases.status')->name('update-status');
+        Route::patch('{purchaseRequest}/sales', 'assignSales')->middleware('can:purchases.view')->name('assign-sales');
     });
 
     // Verifikasi bukti pembayaran customer (bukti harus milik pengajuan di URL).
@@ -284,17 +299,35 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         ->except('show')
         ->parameters(['layanan' => 'service'])
         ->names('services')
-        ->middleware('can:services.manage')
+        ->middleware('can:services.view')
+        ->middlewareFor(['create', 'store', 'edit', 'update'], 'can:services.manage')
         ->middlewareFor('destroy', 'can:master.delete');
 
-    Route::controller(AdminServiceBookingController::class)->prefix('servis')->name('service-bookings.')->middleware('can:service-bookings.manage')->group(function () {
+    // Master suku cadang (Spare Part)
+    Route::patch('spare-part/{sparePart}/status', [AdminSparePartController::class, 'toggleActive'])
+        ->middleware('can:spare-parts.manage')
+        ->name('spare-parts.toggle-active');
+
+    Route::resource('spare-part', AdminSparePartController::class)
+        ->except('show')
+        ->parameters(['spare-part' => 'sparePart'])
+        ->names('spare-parts')
+        ->middleware('can:spare-parts.view')
+        ->middlewareFor(['create', 'store', 'edit', 'update', 'destroy'], 'can:spare-parts.manage');
+
+    Route::controller(AdminServiceBookingController::class)->prefix('servis')->name('service-bookings.')->middleware('can:service-bookings.view')->group(function () {
         Route::get('/', 'index')->name('index');
         Route::get('{serviceBooking}', 'show')->name('show');
-        Route::patch('{serviceBooking}/status', 'updateStatus')->name('update-status');
-        Route::patch('{serviceBooking}/jadwal', 'reschedule')->name('reschedule');
-        Route::patch('{serviceBooking}/mekanik', 'assignMechanic')->name('assign-mechanic');
-        Route::post('{serviceBooking}/pekerjaan', 'addTask')->name('tasks.store');
-        Route::delete('{serviceBooking}/pekerjaan/{task}', 'removeTask')->scopeBindings()->name('tasks.destroy');
+        Route::get('{serviceBooking}/cetak-spk', 'printWorkOrder')->name('print-work-order');
+        Route::patch('{serviceBooking}/status', 'updateStatus')->middleware('can:service-bookings.manage')->name('update-status');
+        Route::patch('{serviceBooking}/jadwal', 'reschedule')->middleware('can:service-bookings.manage')->name('reschedule');
+        Route::patch('{serviceBooking}/mekanik', 'assignMechanic')->middleware('can:service-bookings.manage')->name('assign-mechanic');
+        Route::patch('{serviceBooking}/pekerjaan/{task}', 'updateTask')->middleware('can:service-bookings.manage')->scopeBindings()->name('tasks.update');
+        Route::post('{serviceBooking}/pekerjaan', 'addTask')->middleware('can:service-bookings.manage')->name('tasks.store');
+        Route::delete('{serviceBooking}/pekerjaan/{task}', 'removeTask')->middleware('can:service-bookings.manage')->scopeBindings()->name('tasks.destroy');
+        Route::post('{serviceBooking}/spare-parts', 'addSparePart')->middleware('can:service-bookings.manage')->name('spare-parts.store');
+        Route::delete('{serviceBooking}/spare-parts/{sparePart}', 'removeSparePart')->middleware('can:service-bookings.manage')->scopeBindings()->name('spare-parts.destroy');
+        Route::patch('{serviceBooking}/temuan', 'updateFindings')->middleware('can:service-bookings.manage')->name('findings');
     });
 
     // Moderasi ulasan customer (tampil di beranda setelah disetujui).
@@ -323,7 +356,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     // Kelola akun staf: owner (semua) & super admin (kecuali Owner/Super Admin), lihat User::MANAGEABLE_STAFF_ROLES.
     Route::resource('staf', StaffController::class)
-        ->only(['index', 'create', 'store', 'edit', 'update'])
+        ->only(['index', 'create', 'store', 'edit', 'update', 'destroy'])
         ->parameters(['staf' => 'user'])
         ->names('staff')
         ->middleware('can:staff.manage');

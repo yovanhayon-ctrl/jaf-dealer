@@ -12,6 +12,7 @@
 @section('content')
     <div class="card admin-form-card">
         <div class="card-body p-4">
+            <h2 class="h5 mb-4">Informasi Kategori</h2>
             <form method="POST" action="{{ route('admin.categories.store') }}" novalidate>
                 @include('admin.categories._form')
             </form>

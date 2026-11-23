@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Account;
 use App\Http\Controllers\Account\Concerns\FiltersByStatusGroup;
 use App\Http\Controllers\Controller;
 use App\Models\ServiceBooking;
+use App\Models\SparePart;
 use App\Notifications\Admin\AdminActivityNotification;
 use App\Notifications\Admin\ServiceBookingActivity;
 use Illuminate\Http\RedirectResponse;
@@ -64,6 +65,12 @@ class ServiceBookingController extends Controller
 
             if (! $locked->canBeCancelledByCustomer()) {
                 return 'denied';
+            }
+
+            foreach ($locked->spareParts as $item) {
+                if ($item->spare_part_id && ($part = SparePart::find($item->spare_part_id))) {
+                    $part->increment('stock', $item->quantity);
+                }
             }
 
             $locked->update(['status' => ServiceBooking::STATUS_CANCELLED]);

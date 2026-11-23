@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\RescheduleRequest;
 use App\Http\Requests\Admin\TestDriveStatusRequest;
 use App\Models\TestDrive;
+use App\Models\User;
 use App\Notifications\Notifier;
 use App\Notifications\TestDriveStatusChanged;
 use DateTime;
@@ -15,6 +16,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 /**
@@ -32,8 +34,14 @@ class TestDriveController extends Controller
     {
         $filters = $this->filters($request);
 
-        $testDrives = TestDrive::query()
-            ->with(['user:id,name,email', 'car:id,brand_id,name,year', 'car.brand:id,name'])
+        $query = TestDrive::query()
+            ->with(['user:id,name,email', 'car:id,brand_id,name,year', 'car.brand:id,name', 'sales:id,name']);
+
+        if ($request->user()->isSales()) {
+            $query->where('sales_id', $request->user()->id);
+        }
+
+        $testDrives = $query
             ->tap(fn (Builder $query) => $this->applyFilters($query, $filters))
             ->tap(function (Builder $query) use ($filters) {
                 foreach (self::SORTS[$filters['urut']] as [$column, $direction]) {
@@ -51,19 +59,31 @@ class TestDriveController extends Controller
         ]);
     }
 
-    public function show(TestDrive $testDrive): View
+    public function show(Request $request, TestDrive $testDrive): View
     {
+        if ($request->user()->isSales()) {
+            abort_unless($testDrive->isAssignedTo($request->user()), 404);
+        }
+
         $testDrive->load([
             'user:id,name,email,phone',
             'car:id,brand_id,name,slug,year,vehicle_condition,stock,is_active',
             'car.brand:id,name',
+            'sales:id,name',
         ]);
 
-        return view('admin.test-drives.show', ['testDrive' => $testDrive]);
+        return view('admin.test-drives.show', [
+            'testDrive' => $testDrive,
+            'salesStaff' => User::activeSales()->pluck('name', 'id')->all(),
+        ]);
     }
 
     public function updateStatus(TestDriveStatusRequest $request, TestDrive $testDrive): RedirectResponse
     {
+        if ($request->user()->isSales()) {
+            abort_unless($testDrive->isAssignedTo($request->user()), 404);
+        }
+
         $oldLabel = $testDrive->statusLabel();
         $status = $request->validated('status');
         $redirect = redirect()->route('admin.test-drives.show', $testDrive);
@@ -112,6 +132,10 @@ class TestDriveController extends Controller
      */
     public function reschedule(RescheduleRequest $request, TestDrive $testDrive, RescheduleBooking $reschedule): RedirectResponse
     {
+        if ($request->user()->isSales()) {
+            abort_unless($testDrive->isAssignedTo($request->user()), 404);
+        }
+
         $redirect = redirect()->route('admin.test-drives.show', $testDrive);
 
         try {
@@ -121,6 +145,24 @@ class TestDriveController extends Controller
         }
 
         return $redirect->with('success', 'Jadwal diubah ke '.$updated->preferred_date->translatedFormat('d M Y')." {$updated->timeLabel()} WIB. Customer sudah diberi tahu.");
+    }
+
+    /**
+     * Tugaskan sales ke test drive.
+     */
+    public function assignSales(Request $request, TestDrive $testDrive): RedirectResponse
+    {
+        abort_unless($request->user()->can('test-drives.manage') && ! $request->user()->isSales(), 403);
+
+        $validated = $request->validate([
+            'sales_id' => ['required', Rule::exists('users', 'id')->where('role', User::ROLE_SALES)->where('is_active', true)],
+        ], ['sales_id.required' => 'Pilih sales.', 'sales_id.exists' => 'Sales tidak ditemukan atau sudah nonaktif.']);
+
+        $sales = User::findOrFail($validated['sales_id']);
+        $testDrive->update(['sales_id' => $sales->id]);
+
+        return redirect()->route('admin.test-drives.show', $testDrive)
+            ->with('success', "Test drive berhasil ditugaskan ke Sales {$sales->name}.");
     }
 
     /**

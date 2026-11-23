@@ -59,7 +59,18 @@ class LegalPageTest extends TestCase
         }
     }
 
-    #[DataProvider('pages')]
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function pageRoutes(): array
+    {
+        return [
+            'kebijakan privasi' => ['privacy'],
+            'syarat ketentuan' => ['terms'],
+        ];
+    }
+
+    #[DataProvider('pageRoutes')]
     public function test_kontak_kosong_tidak_ditampilkan(string $route): void
     {
         $this->dealer(['email' => '', 'whatsapp' => '', 'address' => '']);

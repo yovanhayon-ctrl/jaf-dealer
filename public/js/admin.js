@@ -2,6 +2,19 @@
  * Dealer Mobil — script kecil untuk halaman admin.
  */
 document.addEventListener('DOMContentLoaded', function () {
+    // <select data-auto-submit>: kirim form begitu pilihan berubah.
+    document.querySelectorAll('[data-auto-submit]').forEach(function (field) {
+        field.addEventListener('change', function () {
+            var form = field.form;
+            if (!form) return;
+            if (typeof form.requestSubmit === 'function') {
+                form.requestSubmit();
+            } else {
+                form.submit();
+            }
+        });
+    });
+
     // <form data-confirm="Pesan?">: minta konfirmasi sebelum dikirim (mis. menerima bukti / mencatat pembayaran).
     document.querySelectorAll('form[data-confirm]').forEach(function (form) {
         form.addEventListener('submit', function (event) {
@@ -102,17 +115,24 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // Pengaturan: kolom gambar banner hanya tampil untuk latar hero "Gambar banner".
+    // Pengaturan: kolom gambar banner / video showcase hanya tampil saat opsi terkait dipilih.
     var heroImageField = document.getElementById('heroImageField');
+    var heroShowcaseVideoField = document.getElementById('heroShowcaseVideoField');
 
-    if (heroImageField) {
-        var syncHeroImageField = function () {
+    if (heroImageField || heroShowcaseVideoField) {
+        var syncHeroFields = function () {
             var checked = document.querySelector('input[name="hero_background"]:checked');
-            heroImageField.classList.toggle('d-none', !checked || checked.value !== 'image');
+            var val = checked ? checked.value : '';
+            if (heroImageField) {
+                heroImageField.classList.toggle('d-none', val !== 'image');
+            }
+            if (heroShowcaseVideoField) {
+                heroShowcaseVideoField.classList.toggle('d-none', val !== 'showcase');
+            }
         };
 
         document.querySelectorAll('input[name="hero_background"]').forEach(function (radio) {
-            radio.addEventListener('change', syncHeroImageField);
+            radio.addEventListener('change', syncHeroFields);
         });
     }
 
@@ -235,5 +255,93 @@ document.addEventListener('DOMContentLoaded', function () {
 
             new window.Chart(canvas, config);
         });
+    }
+
+    // Live preview untuk foto Spare Part di panel Admin
+    var sparePartPreview = document.getElementById('sparePartImagePreview');
+    var sparePartEmpty = document.getElementById('sparePartEmptyPreview');
+    var sparePartError = document.getElementById('sparePartImageError');
+    var sparePartUrlInput = document.getElementById('image_url');
+    var sparePartFileInput = document.getElementById('image');
+    var sparePartRemove = document.getElementById('remove_image');
+    var sparePartBtnCheck = document.getElementById('btnPreviewUrl');
+
+    if (sparePartPreview && sparePartUrlInput && sparePartFileInput) {
+        var showSparePartImage = function (src) {
+            if (sparePartError) sparePartError.classList.add('d-none');
+            if (sparePartEmpty) sparePartEmpty.classList.add('d-none');
+            sparePartPreview.src = src;
+            sparePartPreview.classList.remove('d-none');
+            if (sparePartRemove) sparePartRemove.checked = false;
+        };
+
+        var showSparePartEmpty = function () {
+            if (sparePartError) sparePartError.classList.add('d-none');
+            sparePartPreview.classList.add('d-none');
+            sparePartPreview.removeAttribute('src');
+            if (sparePartEmpty) sparePartEmpty.classList.remove('d-none');
+        };
+
+        var showSparePartError = function () {
+            sparePartPreview.classList.add('d-none');
+            if (sparePartEmpty) sparePartEmpty.classList.add('d-none');
+            if (sparePartError) sparePartError.classList.remove('d-none');
+        };
+
+        sparePartPreview.addEventListener('error', function () {
+            if (sparePartPreview.getAttribute('src')) {
+                showSparePartError();
+            }
+        });
+
+        sparePartPreview.addEventListener('load', function () {
+            if (sparePartPreview.getAttribute('src')) {
+                if (sparePartError) sparePartError.classList.add('d-none');
+                if (sparePartEmpty) sparePartEmpty.classList.add('d-none');
+                sparePartPreview.classList.remove('d-none');
+            }
+        });
+
+        var syncFromUrl = function () {
+            var val = sparePartUrlInput.value.trim();
+            if (val.indexOf('http://') === 0 || val.indexOf('https://') === 0) {
+                sparePartFileInput.value = '';
+                showSparePartImage(val);
+            } else if (val === '') {
+                if (sparePartFileInput.files && sparePartFileInput.files[0]) {
+                    syncFromFile();
+                } else {
+                    showSparePartEmpty();
+                }
+            }
+        };
+
+        var syncFromFile = function () {
+            var file = sparePartFileInput.files && sparePartFileInput.files[0];
+            if (file && file.type.indexOf('image/') === 0) {
+                sparePartUrlInput.value = '';
+                showSparePartImage(URL.createObjectURL(file));
+            } else if (!sparePartUrlInput.value.trim()) {
+                showSparePartEmpty();
+            }
+        };
+
+        sparePartUrlInput.addEventListener('input', syncFromUrl);
+        sparePartUrlInput.addEventListener('change', syncFromUrl);
+        if (sparePartBtnCheck) {
+            sparePartBtnCheck.addEventListener('click', syncFromUrl);
+        }
+
+        sparePartFileInput.addEventListener('change', syncFromFile);
+
+        if (sparePartRemove) {
+            sparePartRemove.addEventListener('change', function () {
+                if (sparePartRemove.checked) {
+                    sparePartUrlInput.value = '';
+                    sparePartFileInput.value = '';
+                    showSparePartEmpty();
+                }
+            });
+        }
     }
 });

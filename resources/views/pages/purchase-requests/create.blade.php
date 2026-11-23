@@ -41,7 +41,7 @@
                                 @if ($car->hasPromoPrice())
                                     <del class="price-old small me-1"><x-price :amount="$car->price" /></del>
                                 @endif
-                                <x-price :amount="$price" class="fw-bold text-accent" />
+                                <span id="purchaseCarPrice"><x-price :amount="$price" class="fw-bold text-accent" /></span>
                             </p>
                         </div>
                     </div>
@@ -81,11 +81,42 @@
                             <form method="POST" action="{{ route('purchase-requests.store', $car) }}" novalidate data-disable-on-submit
                                   data-purchase-form
                                   data-price="{{ $price }}"
+                                  data-base-price="{{ $car->finalPrice() }}"
                                   data-rates='@json($rates)'
                                   data-dp-min="{{ config('credit.dp_min') }}"
                                   data-dp-max="{{ config('credit.dp_max') }}"
                                   data-rounding="{{ config('credit.rounding') }}">
                                 @csrf
+
+                                @if (!empty($colorSwatches))
+                                    <div class="mb-3">
+                                        <label for="color" class="form-label fs-6">Pilihan Warna Mobil<span class="text-danger ms-1" aria-hidden="true">*</span></label>
+                                        <select id="color" name="color" @class(['form-select', 'is-invalid' => $errors->has('color')]) required>
+                                            <option value="" data-extra-price="0">-- Pilih Warna Mobil --</option>
+                                            @foreach ($colorSwatches as $swatch)
+                                                @php
+                                                    $sStock = (int) ($swatch['stock'] ?? 1);
+                                                    $sExtraPrice = (int) ($swatch['extra_price'] ?? 0);
+                                                    $isCurrent = (old('color', $selectedColor) === $swatch['name']);
+                                                @endphp
+                                                <option value="{{ $swatch['name'] }}"
+                                                        data-extra-price="{{ $sExtraPrice }}"
+                                                        @selected($isCurrent)
+                                                        @disabled($sStock <= 0)>
+                                                    {{ $swatch['name'] }}
+                                                    @if ($sExtraPrice > 0)
+                                                        (+Rp {{ number_format($sExtraPrice, 0, ',', '.') }})
+                                                    @endif
+                                                    {{ $sStock > 0 ? "(Stok: {$sStock} unit)" : "(Stok Habis)" }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                        @error('color')
+                                            <div class="invalid-feedback d-block">{{ $message }}</div>
+                                        @enderror
+                                        <div class="form-text">Ketersediaan unit disesuaikan dengan stok warna yang dipilih.</div>
+                                    </div>
+                                @endif
 
                                 <fieldset class="mb-3">
                                     <legend class="form-label fs-6">Metode Pembayaran<span class="text-danger ms-1" aria-hidden="true">*</span></legend>

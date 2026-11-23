@@ -61,13 +61,20 @@ class CarController extends Controller
         $car->load([
             'brand:id,name,slug',
             'category:id,name,slug',
-            // Gambar utama dulu, lalu sesuai urutan galeri admin.
-            'images' => fn ($query) => $query->reorder()->orderByDesc('is_primary')->orderBy('sort_order')->orderBy('id'),
+            // Urutan foto sesuai urutan slot galeri (slot 1 = warna 1, slot 2 = warna 2, dst).
+            'images' => fn ($query) => $query->reorder()->orderBy('sort_order')->orderBy('id'),
             'activePromos' => fn ($query) => $query->orderByDesc('discount_amount')->orderBy('id'),
         ]);
 
         $title = "{$car->brand->name} {$car->name} {$car->year}";
-        $finalPrice = $car->finalPrice();
+
+        // Tentukan warna awal dari foto utama (atau foto pertama) untuk menampilkan harga awal yang akurat
+        $primaryImage = $car->images->firstWhere('is_primary', true) ?? $car->images->first();
+        $initialColor = $primaryImage?->color_name;
+        if (! $initialColor && ! empty($car->color_palette)) {
+            $initialColor = $car->color_palette[0]['name'] ?? null;
+        }
+        $finalPrice = $car->finalPriceForColor($initialColor);
 
         return view('pages.cars.show', [
             'car' => $car,

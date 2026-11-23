@@ -7,9 +7,12 @@ use App\Actions\RescheduleBooking;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\RescheduleRequest;
 use App\Http\Requests\Admin\ServiceBookingStatusRequest;
+use App\Models\ActivityLog;
 use App\Models\Service;
 use App\Models\ServiceBooking;
+use App\Models\ServiceBookingSparePart;
 use App\Models\ServiceBookingTask;
+use App\Models\SparePart;
 use App\Models\User;
 use App\Notifications\MechanicJobAssigned;
 use App\Notifications\Notifier;
@@ -18,8 +21,10 @@ use DomainException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -64,12 +69,63 @@ class ServiceBookingController extends Controller
             'service:id,name,price_from,duration_minutes,is_active,checklist',
             'mechanic:id,name,is_active',
             'tasks',
+            'spareParts.sparePart',
             'mechanicRating',
         ]);
 
+        $activeBookings = ServiceBooking::query()
+            ->active()
+            ->whereNotNull('mechanic_id')
+            ->where('id', '!=', $serviceBooking->id)
+            ->get(['id', 'mechanic_id', 'status', 'preferred_date', 'preferred_time', 'plate_number']);
+
+        $activeByMechanic = $activeBookings->groupBy('mechanic_id');
+        $targetDateStr = $serviceBooking->preferred_date?->toDateString();
+        $targetTimeStr = substr((string) $serviceBooking->preferred_time, 0, 5);
+
+        $mechanics = User::activeMechanics()
+            ->get(['id', 'name'])
+            ->mapWithKeys(function ($m) use ($activeByMechanic, $targetDateStr, $targetTimeStr) {
+                /** @var \Illuminate\Support\Collection<int, ServiceBooking> $mBookings */
+                $mBookings = $activeByMechanic->get($m->id, collect());
+
+                // 1. Cek bentrok jadwal pada tanggal & jam yang sama persis
+                $conflict = $mBookings->first(function ($b) use ($targetDateStr, $targetTimeStr) {
+                    return $b->preferred_date?->toDateString() === $targetDateStr
+                        && substr((string) $b->preferred_time, 0, 5) === $targetTimeStr;
+                });
+
+                if ($conflict) {
+                    return [$m->id => [
+                        'name' => $m->name,
+                        'label' => "{$m->name} (Bentrok jadwal jam ini)",
+                        'disabled' => true,
+                    ]];
+                }
+
+                // 2. Cek apakah sedang mengerjakan servis lain (status in_progress)
+                $inProgress = $mBookings->firstWhere('status', ServiceBooking::STATUS_IN_PROGRESS);
+                if ($inProgress) {
+                    return [$m->id => [
+                        'name' => $m->name,
+                        'label' => "{$m->name} (Sedang mengerjakan: {$inProgress->plate_number})",
+                        'disabled' => false,
+                    ]];
+                }
+
+                // 3. Mekanik luang / tersedia
+                return [$m->id => [
+                    'name' => $m->name,
+                    'label' => "{$m->name} (Tersedia)",
+                    'disabled' => false,
+                ]];
+            })
+            ->all();
+
         return view('admin.service-bookings.show', [
             'booking' => $serviceBooking,
-            'mechanics' => User::activeMechanics()->pluck('name', 'id')->all(),
+            'mechanics' => $mechanics,
+            'spareParts' => SparePart::query()->active()->where('stock', '>', 0)->orderBy('name')->get(['id', 'part_number', 'name', 'price', 'stock', 'unit']),
         ]);
     }
 
@@ -115,6 +171,28 @@ class ServiceBookingController extends Controller
         }
 
         $mechanic = User::findOrFail($validated['mechanic_id']);
+
+        // Anti-bentrok jadwal: tolak jika mekanik sudah memiliki booking aktif lain pada tanggal & jam yang sama persis
+        $targetDateStr = $serviceBooking->preferred_date?->toDateString();
+        $targetTimeStr = substr((string) $serviceBooking->preferred_time, 0, 5);
+
+        $conflict = ServiceBooking::query()
+            ->active()
+            ->where('mechanic_id', $mechanic->id)
+            ->where('id', '!=', $serviceBooking->id)
+            ->whereDate('preferred_date', $targetDateStr)
+            ->whereTime('preferred_time', '=', "{$targetTimeStr}:00")
+            ->first(['id', 'plate_number', 'preferred_date', 'preferred_time']);
+
+        if ($conflict) {
+            $formattedDate = $serviceBooking->preferred_date?->translatedFormat('d M Y') ?? $targetDateStr;
+            $formattedTime = $serviceBooking->timeLabel();
+
+            return $redirect->withInput()->withErrors([
+                'mechanic_id' => "Mekanik {$mechanic->name} sudah memiliki jadwal servis aktif ({$conflict->plate_number}) pada {$formattedDate} pukul {$formattedTime} WIB.",
+            ], 'mechanic');
+        }
+
         $reassigned = $serviceBooking->mechanic_id !== $mechanic->id;
         $serviceBooking->update([
             'mechanic_id' => $mechanic->id,
@@ -168,6 +246,155 @@ class ServiceBookingController extends Controller
         $task->delete();
 
         return $redirect->with('success', "Pekerjaan \"{$task->name}\" dihapus dari checklist.");
+    }
+
+    /**
+     * Admin centang / ubah status butir pekerjaan checklist (selesai, dilewati, belum).
+     */
+    public function updateTask(Request $request, ServiceBooking $serviceBooking, ServiceBookingTask $task): RedirectResponse
+    {
+        $validated = $request->validateWithBag("task{$task->id}", [
+            'status' => ['required', Rule::in(ServiceBookingTask::STATUSES)],
+            'note' => ['nullable', 'string', 'max:'.ServiceBookingTask::MAX_NOTE_LENGTH],
+        ], [], ['note' => 'alasan']);
+
+        $redirect = $this->backToWork($serviceBooking);
+
+        if (! in_array($serviceBooking->status, [ServiceBooking::STATUS_IN_PROGRESS, ServiceBooking::STATUS_COMPLETED], true)) {
+            return $redirect->with('error', 'Checklist pekerjaan baru dapat dicentang saat servis sedang dikerjakan.');
+        }
+
+        $task->update([
+            'status' => $validated['status'],
+            'note' => $validated['status'] === ServiceBookingTask::STATUS_SKIPPED ? ($validated['note'] ?: 'Dilewati oleh admin') : null,
+            'checked_at' => $validated['status'] === ServiceBookingTask::STATUS_PENDING ? null : now(),
+        ]);
+
+        return $redirect->with('success', "Status pekerjaan \"{$task->name}\" diperbarui.");
+    }
+
+    /**
+     * Admin simpan / ubah temuan & rekomendasi teknis untuk customer.
+     */
+    public function updateFindings(Request $request, ServiceBooking $serviceBooking): RedirectResponse
+    {
+        $validated = $request->validateWithBag('findings', [
+            'findings' => ['nullable', 'string', 'max:'.ServiceBooking::MAX_FINDINGS_LENGTH],
+        ], [], ['findings' => 'temuan & rekomendasi']);
+
+        $serviceBooking->update(['findings' => trim((string) $validated['findings']) ?: null]);
+
+        return $this->backToWork($serviceBooking)->with('success', 'Temuan & rekomendasi disimpan.');
+    }
+
+    /**
+     * Tambah suku cadang / spare part yang diganti karena rusak pada kendaraan customer.
+     */
+    public function addSparePart(Request $request, ServiceBooking $serviceBooking): RedirectResponse
+    {
+        $validated = $request->validateWithBag('sparePart', [
+            'spare_part_id' => ['required', Rule::exists('spare_parts', 'id')->where('is_active', true)],
+            'quantity' => ['required', 'integer', 'min:1'],
+            'condition_note' => ['nullable', 'string', 'max:'.ServiceBookingSparePart::MAX_NOTE_LENGTH],
+        ], [
+            'spare_part_id.required' => 'Pilih suku cadang.',
+            'spare_part_id.exists' => 'Suku cadang tidak ditemukan atau tidak aktif.',
+            'quantity.required' => 'Jumlah suku cadang wajib diisi.',
+            'quantity.min' => 'Jumlah suku cadang minimal 1.',
+        ], ['condition_note' => 'catatan kerusakan']);
+
+        $redirect = redirect()->to(route('admin.service-bookings.show', $serviceBooking).'#spare-parts');
+
+        if (! $serviceBooking->canBeAssigned()) {
+            return $redirect->with('error', 'Suku cadang tidak bisa diubah setelah booking selesai atau dibatalkan.');
+        }
+
+        try {
+            $sparePart = DB::transaction(function () use ($serviceBooking, $validated) {
+                $sparePart = SparePart::whereKey($validated['spare_part_id'])->lockForUpdate()->firstOrFail();
+                $qty = (int) $validated['quantity'];
+
+                if ($sparePart->stock < $qty) {
+                    throw ValidationException::withMessages([
+                        'quantity' => "Stok tidak mencukupi (sisa {$sparePart->stock} {$sparePart->unit}).",
+                    ]);
+                }
+
+                $sparePart->decrement('stock', $qty);
+
+                $serviceBooking->spareParts()->create([
+                    'spare_part_id' => $sparePart->id,
+                    'part_name' => $sparePart->name,
+                    'part_number' => $sparePart->part_number,
+                    'quantity' => $qty,
+                    'price' => $sparePart->price,
+                    'subtotal' => $sparePart->price * $qty,
+                    'condition_note' => trim((string) ($validated['condition_note'] ?? '')) ?: null,
+                ]);
+
+                return $sparePart;
+            });
+        } catch (ValidationException $e) {
+            return $redirect->withErrors($e->errors(), 'sparePart');
+        }
+
+        ActivityLog::record(
+            ActivityLog::CATEGORY_FINANCE,
+            'service_booking.add_spare_part',
+            "Menambahkan {$validated['quantity']} {$sparePart->unit} \"{$sparePart->name}\" (".ActivityLog::rupiah($sparePart->price * (int) $validated['quantity']).") ke booking servis #{$serviceBooking->id}",
+            $serviceBooking,
+            ['spare_part_id' => $sparePart->id, 'quantity' => (int) $validated['quantity'], 'subtotal' => $sparePart->price * (int) $validated['quantity']]
+        );
+
+        return $redirect->with('success', "Suku cadang \"{$sparePart->name}\" berhasil ditambahkan.");
+    }
+
+    /**
+     * Hapus suku cadang dari booking servis dan kembalikan stok.
+     */
+    public function removeSparePart(ServiceBooking $serviceBooking, ServiceBookingSparePart $sparePart): RedirectResponse
+    {
+        $redirect = redirect()->to(route('admin.service-bookings.show', $serviceBooking).'#spare-parts');
+
+        if (! $serviceBooking->canBeAssigned()) {
+            return $redirect->with('error', 'Suku cadang tidak bisa diubah setelah booking selesai atau dibatalkan.');
+        }
+
+        DB::transaction(function () use ($sparePart) {
+            if ($sparePart->spare_part_id && ($masterPart = SparePart::whereKey($sparePart->spare_part_id)->lockForUpdate()->first())) {
+                $masterPart->increment('stock', $sparePart->quantity);
+            }
+
+            $sparePart->delete();
+        });
+
+        ActivityLog::record(
+            ActivityLog::CATEGORY_FINANCE,
+            'service_booking.remove_spare_part',
+            "Menghapus {$sparePart->quantity} unit \"{$sparePart->part_name}\" dari booking servis #{$serviceBooking->id} dan mengembalikan stok",
+            $serviceBooking,
+            ['spare_part_id' => $sparePart->spare_part_id, 'quantity' => $sparePart->quantity, 'subtotal' => $sparePart->subtotal]
+        );
+
+        return $redirect->with('success', "Suku cadang \"{$sparePart->part_name}\" dihapus dan stok dikembalikan.");
+    }
+
+    /**
+     * Tampilan cetak Surat Perintah Kerja (SPK) / Struk Kerja Mekanik.
+     */
+    public function printWorkOrder(ServiceBooking $serviceBooking): View
+    {
+        $serviceBooking->load([
+            'user:id,name,email,phone',
+            'service:id,name,price_from,duration_minutes',
+            'mechanic:id,name',
+            'tasks',
+            'spareParts',
+        ]);
+
+        return view('admin.service-bookings.print', [
+            'booking' => $serviceBooking,
+        ]);
     }
 
     /**

@@ -74,12 +74,22 @@
                             <td><x-status-badge :status="$member->isActive() ? 'active' : 'inactive'" /></td>
                             <td class="text-end">
                                 @if (auth()->user()->canManageStaffAccount($member))
-                                    <a href="{{ route('admin.staff.edit', $member) }}" class="btn btn-sm btn-outline-primary"
-                                       aria-label="Ubah akun {{ $member->name }}">
-                                        <i class="bi bi-pencil"></i>Ubah
-                                    </a>
+                                    <div class="d-inline-flex gap-1">
+                                        <a href="{{ route('admin.staff.edit', $member) }}" class="btn btn-sm btn-outline-primary"
+                                           aria-label="Ubah akun {{ $member->name }}">
+                                            <i class="bi bi-pencil"></i>Ubah
+                                        </a>
+                                        <form method="POST" action="{{ route('admin.staff.destroy', $member) }}"
+                                              data-confirm="Hapus akun staf {{ $member->name }} ({{ $member->roleLabel() }})? Tindakan ini tidak dapat dibatalkan.">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" aria-label="Hapus akun {{ $member->name }}">
+                                                <i class="bi bi-trash"></i>Hapus
+                                            </button>
+                                        </form>
+                                    </div>
                                 @else
-                                    <span class="small text-muted">{{ $member->id === auth()->id() ? 'Akun Anda' : ($member->isOwner() ? 'Pemilik' : 'Khusus owner') }}</span>
+                                    <span class="small text-muted">{{ $member->id === auth()->id() ? 'Akun Anda' : ($member->isOwner() ? 'Pemilik' : 'Tidak dapat diubah') }}</span>
                                 @endif
                             </td>
                         </tr>

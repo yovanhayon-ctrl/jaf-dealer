@@ -26,7 +26,7 @@ class CarImageManagementTest extends TestCase
         parent::setUp();
 
         Storage::fake('public');
-        $this->admin = User::factory()->owner()->create();
+        $this->admin = User::factory()->admin()->create();
         $this->car = Car::factory()->create(['name' => 'Avanza', 'year' => 2025]);
     }
 
@@ -381,5 +381,88 @@ class CarImageManagementTest extends TestCase
         $this->actingAs($this->admin)->get(route('admin.cars.images.index', $car))->assertOk()
             ->assertSee('maks. 8 MB per file')
             ->assertDontSee('maks. 2 MB');
+    }
+
+    public function test_admin_bisa_memperbarui_warna_gambar_mobil(): void
+    {
+        $image = $this->addImage($this->car, 1, true);
+
+        $response = $this->actingAs($this->admin)
+            ->patch(route('admin.cars.images.color', [$this->car, $image]), [
+                'color' => 'Putih Mutiara|#F4F6F9',
+            ]);
+
+        $response->assertRedirect(route('admin.cars.images.index', $this->car))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('car_images', [
+            'id' => $image->id,
+            'color_name' => 'Putih Mutiara',
+            'color_hex' => '#F4F6F9',
+        ]);
+    }
+
+    public function test_admin_bisa_menambah_warna_baru_ke_mobil(): void
+    {
+        $response = $this->actingAs($this->admin)
+            ->post(route('admin.cars.images.colors.store', $this->car), [
+                'name' => 'Kuning Cerah (Solar Yellow)',
+                'hex' => '#EAB308',
+            ]);
+
+        $response->assertRedirect(route('admin.cars.images.index', $this->car))
+            ->assertSessionHas('success');
+
+        $this->car->refresh();
+        $this->assertNotNull($this->car->color_palette);
+        $this->assertTrue(collect($this->car->color_palette)->contains('name', 'Kuning Cerah (Solar Yellow)'));
+    }
+
+    public function test_admin_bisa_menghapus_warna_dari_mobil(): void
+    {
+        $this->car->update([
+            'color_palette' => [
+                ['name' => 'Warna A', 'hex' => '#111111'],
+                ['name' => 'Warna B', 'hex' => '#222222'],
+            ],
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->delete(route('admin.cars.images.colors.destroy', [$this->car, 0]));
+
+        $response->assertRedirect(route('admin.cars.images.index', $this->car))
+            ->assertSessionHas('success');
+
+        $this->car->refresh();
+        $this->assertCount(1, $this->car->color_palette);
+        $this->assertSame('Warna B', $this->car->color_palette[0]['name']);
+    }
+
+    public function test_hapus_gambar_dengan_warna_otomatis_menghapus_warna_dari_palette(): void
+    {
+        $this->car->update([
+            'color_palette' => [
+                ['name' => 'Warna A', 'hex' => '#111111', 'stock' => 2],
+                ['name' => 'Warna B', 'hex' => '#222222', 'stock' => 1],
+            ],
+            'stock' => 3,
+        ]);
+
+        $image = $this->addImage($this->car, 1);
+        $image->update([
+            'color_name' => 'Warna A',
+            'color_hex' => '#111111',
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->delete(route('admin.cars.images.destroy', [$this->car, $image]));
+
+        $response->assertRedirect(route('admin.cars.images.index', $this->car))
+            ->assertSessionHas('success');
+
+        $this->car->refresh();
+        $this->assertCount(1, $this->car->color_palette);
+        $this->assertSame('Warna B', $this->car->color_palette[0]['name']);
+        $this->assertSame(1, $this->car->stock);
     }
 }

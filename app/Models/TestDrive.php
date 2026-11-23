@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'user_id', 'car_id', 'preferred_date', 'preferred_time', 'phone', 'notes',
+    'user_id', 'car_id', 'sales_id', 'preferred_date', 'preferred_time', 'phone', 'notes',
     'status', 'admin_note',
 ])]
 class TestDrive extends Model
@@ -52,6 +52,19 @@ class TestDrive extends Model
 
     /** Status yang wajib disertai catatan admin (alasan untuk customer). */
     public const NOTE_REQUIRED_STATUSES = [self::STATUS_CANCELLED];
+
+    /** Tanda bagian catatan yang wajib dilengkapi admin (alasan membatalkan). */
+    public const NOTE_PLACEHOLDER = '…';
+
+    /**
+     * Catatan admin otomatis saat status diubah (form admin mengisinya, admin boleh mengubah).
+     * Dibatalkan berisi tanda "…" yang wajib diganti alasan sebelum disimpan.
+     */
+    public const NOTE_TEMPLATES = [
+        self::STATUS_CONFIRMED => 'Jadwal test drive Anda telah dikonfirmasi. Silakan datang ke dealer tepat waktu dan siapkan SIM A yang masih berlaku.',
+        self::STATUS_COMPLETED => 'Test drive telah selesai dilaksanakan. Terima kasih atas kunjungan Anda ke dealer kami.',
+        self::STATUS_CANCELLED => 'Mohon maaf, jadwal test drive dibatalkan karena '.self::NOTE_PLACEHOLDER,
+    ];
 
     /** Status yang masih "memegang" jadwal: dipakai cek booking ganda & bentrok slot. */
     public const ACTIVE_STATUSES = [self::STATUS_PENDING, self::STATUS_CONFIRMED];
@@ -94,6 +107,16 @@ class TestDrive extends Model
         return $this->belongsTo(Car::class);
     }
 
+    public function sales(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'sales_id');
+    }
+
+    public function isAssignedTo(?User $user): bool
+    {
+        return $user !== null && $this->sales_id === $user->id;
+    }
+
     public function isPending(): bool
     {
         return $this->status === self::STATUS_PENDING;
@@ -129,10 +152,44 @@ class TestDrive extends Model
     }
 
     /**
+     * Catatan bawaan per status untuk form admin; status Tidak datang memakai noShowNote().
+     *
+     * @return array<string, string>
+     */
+    public function noteTemplates(): array
+    {
+        $templates = self::NOTE_TEMPLATES;
+        $templates[self::STATUS_NO_SHOW] = $this->noShowNote();
+
+        return $templates;
+    }
+
+    /**
      * Jam jadwal "HH:MM" (kolom time bisa berisi detik).
      */
     public function timeLabel(): string
     {
         return substr((string) $this->preferred_time, 0, 5);
+    }
+
+    /**
+     * Pesan WhatsApp (wa.me) untuk admin/sales menghubungi customer test drive secara manual.
+     */
+    public function whatsappContactUrl(?User $staff = null): ?string
+    {
+        $number = preg_replace('/^0/', '62', preg_replace('/\D/', '', (string) $this->phone));
+
+        if ($number === '') {
+            return null;
+        }
+
+        $this->loadMissing(['user', 'car.brand']);
+        $dealerName = (string) config('dealer.name', 'JAF Dealer');
+        $sender = $staff?->name ? "saya {$staff->name} dari {$dealerName}" : "kami dari {$dealerName}";
+        $carLabel = trim("{$this->car->brand->name} {$this->car->name}");
+        $scheduleText = $this->preferred_date->translatedFormat('l, d F Y')." pukul {$this->timeLabel()} WIB";
+        $text = "Halo {$this->user->name}, {$sender}. Menghubungi Anda terkait jadwal test drive mobil {$carLabel} pada {$scheduleText}. Apakah jadwal tersebut sudah sesuai dan ada hal yang ingin ditanyakan sebelum test drive? Terima kasih.";
+
+        return "https://wa.me/{$number}?text=".rawurlencode($text);
     }
 }

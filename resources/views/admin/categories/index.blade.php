@@ -7,19 +7,20 @@
 @endsection
 
 @section('content')
-    <div class="d-flex flex-column flex-sm-row gap-2 justify-content-between mb-3">
-        <form method="GET" action="{{ route('admin.categories.index') }}" class="d-flex gap-2 admin-search" role="search">
-            <input type="search" name="q" value="{{ $search }}" class="form-control" placeholder="Cari nama kategori…" aria-label="Cari nama kategori">
-            <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i><span class="d-none d-md-inline">Cari</span></button>
-            @if ($search !== '')
-                <a href="{{ route('admin.categories.index') }}" class="btn btn-outline-secondary">Reset</a>
-            @endif
-        </form>
-
-        <a href="{{ route('admin.categories.create') }}" class="btn btn-accent">
+    <x-admin.list-header :summary="number_format($categories->total(), 0, ',', '.').' kategori'.($search !== '' ? ' ditemukan' : '')">
+        <a href="{{ route('admin.categories.create') }}" class="btn btn-accent btn-sm">
             <i class="bi bi-plus-lg"></i>Tambah Kategori
         </a>
-    </div>
+    </x-admin.list-header>
+
+    <x-admin.filters :action="route('admin.categories.index')" :reset-url="route('admin.categories.index')"
+                     :active="$search !== '' ? 1 : 0" :show-reset="$search !== ''">
+        <div class="col-12 col-md-6 col-lg">
+            <label for="filter_q" class="form-label small mb-1">Cari kategori</label>
+            <input type="search" id="filter_q" name="q" value="{{ $search }}" class="form-control form-control-sm"
+                   placeholder="Nama kategori…" aria-label="Cari nama kategori">
+        </div>
+    </x-admin.filters>
 
     <div class="card">
         @if ($categories->isEmpty())
@@ -35,9 +36,8 @@
                 <table class="table table-hover align-middle mb-0 admin-table">
                     <thead>
                         <tr>
-                            <th class="text-center" style="width: 60px">No</th>
-                            <th>Nama</th>
-                            <th>Slug</th>
+                            <th class="text-center" style="width: 50px">No</th>
+                            <th>Kategori</th>
                             <th class="text-center">Jumlah Mobil</th>
                             <th class="text-end">Aksi</th>
                         </tr>
@@ -45,10 +45,27 @@
                     <tbody>
                         @foreach ($categories as $category)
                             <tr>
-                                <td class="text-center text-muted">{{ $categories->firstItem() + $loop->index }}</td>
-                                <td class="fw-semibold">{{ $category->name }}</td>
-                                <td class="text-muted small">{{ $category->slug }}</td>
-                                <td class="text-center">{{ $category->cars_count }}</td>
+                                <td class="text-center text-muted small">{{ $categories->firstItem() + $loop->index }}</td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <span class="admin-thumb admin-thumb-empty flex-shrink-0">
+                                            <i class="bi bi-grid"></i>
+                                        </span>
+                                        <div class="min-w-0">
+                                            <div class="fw-semibold text-truncate">{{ $category->name }}</div>
+                                            <div class="small text-muted font-monospace">{{ $category->slug }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    @if ($category->cars_count > 0)
+                                        <span class="badge bg-secondary-subtle text-secondary-emphasis fw-semibold">
+                                            {{ $category->cars_count }} mobil
+                                        </span>
+                                    @else
+                                        <span class="text-muted small">0 mobil</span>
+                                    @endif
+                                </td>
                                 <td class="text-end text-nowrap">
                                     @include('admin.partials.row-actions', [
                                         'editUrl' => route('admin.categories.edit', $category),

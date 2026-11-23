@@ -66,9 +66,9 @@ class SettingTest extends TestCase
             ->assertDontSee('Kosongkan untuk kembali ke bawaan')
             ->assertSee('href="'.route('admin.settings.edit').'"', false);
 
-        $this->actingAs(User::factory()->superAdmin()->create())->get(route('admin.settings.edit'))->assertOk();
-        $this->actingAs(User::factory()->admin()->create())->get(route('admin.settings.edit'))->assertForbidden();
-        $this->actingAs(User::factory()->admin()->create())->put(route('admin.settings.update'), $this->form())->assertForbidden();
+        $this->actingAs(User::factory()->admin()->create())->get(route('admin.settings.edit'))->assertOk();
+        $this->actingAs(User::factory()->sales()->create())->get(route('admin.settings.edit'))->assertForbidden();
+        $this->actingAs(User::factory()->sales()->create())->put(route('admin.settings.update'), $this->form())->assertForbidden();
     }
 
     public function test_nilai_sama_dengan_bawaan_tidak_disimpan(): void
@@ -184,18 +184,79 @@ class SettingTest extends TestCase
         $this->get(route('home'))->assertDontSee('has-banner', false)->assertDontSee('hero-video', false);
     }
 
+    public function test_latar_showcase_video_bisa_disimpan_dan_tampil_di_beranda(): void
+    {
+        $this->save(['hero_background' => 'showcase'])->assertSessionHasNoErrors();
+        $this->assertSame('showcase', config('dealer.hero.background'));
+
+        $this->get(route('home'))
+            ->assertSee('hero-mode-showcase', false)
+            ->assertSee('has-showcase', false)
+            ->assertSee('col-lg-5 px-0', false)
+            ->assertSee('hero-showcase-stage', false)
+            ->assertSee('hero-showcase-video', false)
+            ->assertSee('hero-showcase-fade', false)
+            ->assertSee('videos/Nissan_GTR_JAF_Turntable_360_Loop.mp4', false)
+            ->assertDontSee('has-banner', false)
+            ->assertDontSee('data-hero-videos', false);
+    }
+
+    public function test_video_showcase_kustom_bisa_diunggah_diganti_dan_dihapus(): void
+    {
+        $fakeVideo = UploadedFile::fake()->create('custom_gtr.mp4', 2048, 'video/mp4');
+
+        $this->save([
+            'hero_background' => 'showcase',
+            'hero_showcase_video' => $fakeVideo,
+        ])->assertSessionHasNoErrors();
+
+        $savedVideo = Setting::find('hero.showcase_video')->value;
+        $this->assertNotNull($savedVideo);
+        $this->assertStringStartsWith('settings/showcase_video_', $savedVideo);
+        $this->assertStringEndsWith('.mp4', $savedVideo);
+        Storage::disk('public')->assertExists($savedVideo);
+
+        $this->get(route('home'))
+            ->assertSee(Storage::disk('public')->url($savedVideo), false);
+
+        // Upload video baru pengganti
+        $newVideo = UploadedFile::fake()->create('custom_gtr2.webm', 1024, 'video/webm');
+        $this->save([
+            'hero_background' => 'showcase',
+            'hero_showcase_video' => $newVideo,
+        ])->assertSessionHasNoErrors();
+
+        $secondVideo = Setting::find('hero.showcase_video')->value;
+        $this->assertNotSame($savedVideo, $secondVideo);
+        Storage::disk('public')->assertMissing($savedVideo);
+        Storage::disk('public')->assertExists($secondVideo);
+
+        // Hapus video kustom & kembali ke video bawaan
+        $this->save([
+            'hero_background' => 'showcase',
+            'remove_hero_showcase_video' => '1',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertNull(Setting::find('hero.showcase_video'));
+        Storage::disk('public')->assertMissing($secondVideo);
+
+        // Beranda kembali memutar video bawaan
+        $this->get(route('home'))
+            ->assertSee('videos/Nissan_GTR_JAF_Turntable_360_Loop.mp4', false);
+    }
+
     public function test_perubahan_rekening_diberitahukan_ke_owner_lain(): void
     {
         $otherOwner = User::factory()->owner()->create(['name' => 'Yoseph']);
         User::factory()->owner()->create(['is_active' => false]);
-        $super = User::factory()->superAdmin()->create(['name' => 'Rifky']);
+        $ownerActor = User::factory()->owner()->create(['name' => 'Rifky']);
 
         // Bukan perubahan rekening: tidak ada notifikasi.
-        $this->save(['tagline' => 'Baru'], $super);
+        $this->save(['tagline' => 'Baru'], $ownerActor);
         $this->assertSame(0, $otherOwner->notifications()->count());
 
         $this->travelTo(now()->setDateTime(2026, 10, 20, 10, 30));
-        $this->save(['bank_name' => 'BNI', 'bank_account' => '9876543210', 'bank_holder' => 'PT JAF Dealer'], $super);
+        $this->save(['bank_name' => 'BNI', 'bank_account' => '9876543210', 'bank_holder' => 'PT JAF Dealer'], $ownerActor);
 
         foreach ([$this->owner, $otherOwner] as $owner) {
             $notification = $owner->notifications()->sole();
@@ -203,7 +264,7 @@ class SettingTest extends TestCase
             $this->assertSame('Rekening Pembayaran Diubah · Rifky', $notification->data['title']);
             $this->assertSame('Rekening sekarang: BNI 9876543210 a.n. PT JAF Dealer. Sebelumnya: BCA 1111111111 a.n. PT JAF Dealer.', $notification->data['message']);
         }
-        $this->assertSame(0, $super->notifications()->count());
+        $this->assertSame(0, $ownerActor->notifications()->count());
 
         $this->actingAs($this->owner)->get(route('admin.notifications.open', $this->owner->notifications()->sole()->id))
             ->assertRedirect(route('admin.settings.edit').'#rekening');

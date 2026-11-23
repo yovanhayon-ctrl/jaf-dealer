@@ -73,7 +73,7 @@ class EmailNotificationTest extends TestCase
         $secondAdmin = User::factory()->admin()->create();
 
         $this->actingAs($this->customer)->post(route('test-drives.store'), [
-            'car_id' => $this->car->id, 'preferred_date' => '2026-10-12', 'preferred_time' => '10:00', 'phone' => '081234567890',
+            'car_id' => $this->car->id, 'preferred_date' => '2026-10-12', 'preferred_time' => '10:00', 'phone' => '081234567890', 'has_sim' => '1',
         ])->assertSessionHasNoErrors();
 
         foreach ([$this->admin, $secondAdmin] as $admin) {
@@ -154,7 +154,7 @@ class EmailNotificationTest extends TestCase
         $secondAdmin = User::factory()->admin()->create();
 
         $this->actingAs($this->customer)->post(route('test-drives.store'), [
-            'car_id' => $this->car->id, 'preferred_date' => '2026-10-12', 'preferred_time' => '10:00', 'phone' => '081234567890',
+            'car_id' => $this->car->id, 'preferred_date' => '2026-10-12', 'preferred_time' => '10:00', 'phone' => '081234567890', 'has_sim' => '1',
         ])->assertRedirect(route('account.test-drives.index'))->assertSessionHas('success');
 
         $this->assertSame(1, TestDrive::count());

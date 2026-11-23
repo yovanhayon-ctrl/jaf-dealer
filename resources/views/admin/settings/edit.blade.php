@@ -10,6 +10,7 @@
     $heroBackground = (string) old('hero_background', $dealer['hero']['background']);
     $backgroundOptions = [
         'video' => ['bi-camera-reels', 'Video latar di layar lebar, foto mobil unggulan di HP.'],
+        'showcase' => ['bi-play-circle', 'Video Nissan GT-R 360° di sisi kanan hero, berlatar gelap elegan.'],
         'image' => ['bi-image', 'Gambar unggahan sendiri, di semua ukuran layar.'],
         'car' => ['bi-car-front', 'Foto mobil unggulan beserta kartu harganya.'],
     ];
@@ -142,6 +143,40 @@
                                     <div class="form-check mt-2">
                                         <input class="form-check-input" type="checkbox" value="1" id="remove_hero_image" name="remove_hero_image" @checked(old('remove_hero_image'))>
                                         <label class="form-check-label" for="remove_hero_image">Hapus gambar banner saat ini</label>
+                                    </div>
+                                @endif
+                            </div>
+
+                            {{-- Hanya untuk latar "Showcase Mobil 360°" (admin.js menampilkan/menyembunyikan saat pilihan berubah). --}}
+                            <div id="heroShowcaseVideoField" @class(['mb-3', 'd-none' => $heroBackground !== 'showcase' && ! $errors->has('hero_showcase_video')])>
+                                <label for="hero_showcase_video" class="form-label">Unggah Video Showcase (Opsional)</label>
+
+                                @if ($showcaseVideoUrl)
+                                    <div class="mb-2 p-2 bg-body-tertiary rounded border d-flex align-items-center gap-3">
+                                        <video src="{{ $showcaseVideoUrl }}" class="rounded shadow-sm" style="width: 140px; height: 80px; object-fit: cover;" autoplay loop muted playsinline></video>
+                                        <div class="small">
+                                            <span class="d-block fw-semibold text-body">
+                                                <i class="bi bi-camera-video me-1"></i>{{ $hasStoredShowcaseVideo ? 'Video Kustom Aktif' : 'Video Bawaan (Default)' }}
+                                            </span>
+                                            <span class="text-muted d-block">{{ $hasStoredShowcaseVideo ? 'Tersimpan di storage/settings' : 'public/videos/Nissan_GTR_JAF_Turntable_360_Loop.mp4' }}</span>
+                                        </div>
+                                    </div>
+                                @endif
+
+                                <input type="file" id="hero_showcase_video" name="hero_showcase_video" accept=".mp4,.webm,video/mp4,video/webm"
+                                       @class(['form-control', 'is-invalid' => $errors->has('hero_showcase_video')])>
+                                @error('hero_showcase_video')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @else
+                                    <div class="form-text">
+                                        Format MP4 atau WEBM, ukuran maksimal {{ intdiv(\App\Http\Requests\Admin\SettingRequest::MAX_VIDEO_KILOBYTES, 1024) }} MB. Kosongkan jika ingin memakai video bawaan.
+                                    </div>
+                                @enderror
+
+                                @if ($hasStoredShowcaseVideo)
+                                    <div class="form-check mt-2">
+                                        <input class="form-check-input" type="checkbox" value="1" id="remove_hero_showcase_video" name="remove_hero_showcase_video" @checked(old('remove_hero_showcase_video'))>
+                                        <label class="form-check-label" for="remove_hero_showcase_video">Hapus video kustom &amp; kembali ke video bawaan</label>
                                     </div>
                                 @endif
                             </div>

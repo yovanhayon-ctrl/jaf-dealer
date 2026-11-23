@@ -10,6 +10,7 @@ use App\Notifications\Admin\BankAccountChanged;
 use App\Support\CarImageProcessor;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use RuntimeException;
@@ -39,16 +40,24 @@ class SettingController extends Controller
         'hero.lead' => 'teks hero',
         'hero.background' => 'latar hero',
         'hero.image' => 'gambar banner',
+        'hero.showcase_video' => 'video showcase',
     ];
 
     public function edit(): View
     {
         $heroImage = config('dealer.hero.image');
+        $showcaseVideo = config('dealer.hero.showcase_video');
 
         return view('admin.settings.edit', [
             'dealer' => config('dealer'),
             'heroImageUrl' => filled($heroImage) ? Storage::disk('public')->url($heroImage) : null,
             'hasStoredHeroImage' => filled(Setting::values()['hero.image'] ?? null),
+            'showcaseVideoUrl' => filled($showcaseVideo)
+                ? Storage::disk('public')->url($showcaseVideo)
+                : (is_file(public_path('videos/Nissan_GTR_JAF_Turntable_360_Loop.mp4'))
+                    ? asset('videos/Nissan_GTR_JAF_Turntable_360_Loop.mp4')
+                    : null),
+            'hasStoredShowcaseVideo' => filled(Setting::values()['hero.showcase_video'] ?? null),
             // Perubahan rekening terakhir (baris pengaturan rekening yang paling baru diubah).
             'bankEdit' => Setting::query()->with('editor:id,name')->whereIn('key', Setting::BANK_KEYS)->latest('updated_at')->first(),
         ]);
@@ -58,6 +67,7 @@ class SettingController extends Controller
     {
         $values = $request->settings();
         $oldImage = Setting::values()['hero.image'] ?? null;
+        $oldVideo = Setting::values()['hero.showcase_video'] ?? null;
         $oldBank = config('dealer.bank');
 
         if ($request->hasFile('hero_image')) {
@@ -66,10 +76,20 @@ class SettingController extends Controller
             $values['hero.image'] = null;
         }
 
+        if ($request->hasFile('hero_showcase_video')) {
+            $values['hero.showcase_video'] = $this->storeShowcaseVideo($request);
+        } elseif ($request->boolean('remove_hero_showcase_video')) {
+            $values['hero.showcase_video'] = null;
+        }
+
         $changed = Setting::store($values, $request->user());
 
         if ($oldImage && array_key_exists('hero.image', $values) && $oldImage !== $values['hero.image']) {
             Storage::disk('public')->delete($oldImage);
+        }
+
+        if ($oldVideo && array_key_exists('hero.showcase_video', $values) && $oldVideo !== $values['hero.showcase_video']) {
+            Storage::disk('public')->delete($oldVideo);
         }
 
         $newBank = config('dealer.bank');
@@ -101,5 +121,14 @@ class SettingController extends Controller
                 'hero_image' => 'Gambar banner tidak bisa diproses. Coba simpan ulang sebagai JPG lalu unggah lagi.',
             ]);
         }
+    }
+
+    private function storeShowcaseVideo(SettingRequest $request): string
+    {
+        $file = $request->file('hero_showcase_video');
+        $extension = $file->getClientOriginalExtension() ?: 'mp4';
+        $filename = 'showcase_video_'.Str::random(20).'.'.$extension;
+
+        return $file->storeAs(Setting::HERO_DIRECTORY, $filename, 'public');
     }
 }

@@ -40,6 +40,7 @@ class BookService
             $booking = ServiceBooking::create([
                 'user_id' => $user->id,
                 'service_id' => $service->id,
+                'service_price' => $service->price_from,
                 'vehicle_model' => $data['vehicle_model'],
                 'plate_number' => $data['plate_number'],
                 'vehicle_year' => $data['vehicle_year'] ?? null,
@@ -111,13 +112,11 @@ class BookService
             $mechanicBusy = ServiceBooking::query()
                 ->active()
                 ->where('mechanic_id', $mechanicId)
-                ->whereDate('preferred_date', $date)
-                ->whereTime('preferred_time', '=', "{$time}:00")
                 ->when($lock, fn ($query) => $query->lockForUpdate())
                 ->exists();
 
             if ($mechanicBusy) {
-                return ['mechanic_id' => "{$mechanic->name} sudah ada jadwal di jam itu. Pilih jam lain atau mekanik lain."];
+                return ['mechanic_id' => "{$mechanic->name} masih memiliki pengerjaan servis yang belum selesai. Silakan pilih mekanik lain atau biarkan dipilihkan bengkel."];
             }
         }
 

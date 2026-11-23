@@ -35,6 +35,11 @@ class CarSeeder extends Seeder
                 'color' => $car['color'],
                 'stock' => $car['stock'],
                 'description' => $car['description'],
+                'tax_status' => $car['tax_status'] ?? ($car['condition'] === Car::CONDITION_USED ? 'Pajak Hidup' : null),
+                'document_status' => $car['document_status'] ?? ($car['condition'] === Car::CONDITION_USED ? 'Lengkap (BPKB, STNK, Faktur)' : 'Lengkap (Faktur & Dokumen Resmi Baru)'),
+                'ownership_history' => $car['ownership_history'] ?? ($car['condition'] === Car::CONDITION_USED ? 'Tangan Pertama' : null),
+                'plate_type' => $car['plate_type'] ?? ($car['condition'] === Car::CONDITION_USED ? 'Ganjil' : null),
+                'warranty_info' => $car['warranty_info'] ?? ($car['condition'] === Car::CONDITION_USED ? 'Garansi Mesin & Transmisi 1 Tahun Dealer JAF' : 'Garansi Resmi Pabrikan 3 Tahun / 100.000 KM'),
                 'is_active' => $car['active'] ?? true,
             ]);
         }

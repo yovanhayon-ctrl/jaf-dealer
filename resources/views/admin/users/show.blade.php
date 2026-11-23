@@ -34,8 +34,10 @@
                         <dd>
                             @if ($user->phone)
                                 <a href="tel:{{ $user->phone }}">{{ $user->phone }}</a>
-                                <a href="https://wa.me/{{ preg_replace('/^0/', '62', preg_replace('/\D/', '', $user->phone)) }}" target="_blank" rel="noopener"
-                                   class="btn btn-sm btn-outline-success py-0 ms-2"><i class="bi bi-whatsapp"></i>WhatsApp</a>
+                                @if ($waUrl = $user->whatsappContactUrl(auth()->user()))
+                                    <a href="{{ $waUrl }}" target="_blank" rel="noopener"
+                                       class="btn btn-sm btn-outline-success py-0 ms-2"><i class="bi bi-whatsapp"></i>WhatsApp</a>
+                                @endif
                             @else
                                 —
                             @endif

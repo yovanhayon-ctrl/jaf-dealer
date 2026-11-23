@@ -24,7 +24,7 @@ class ChangePurchaseRequestStatus
      *
      * @throws DomainException jika transisi tidak diizinkan atau stok habis (pesan siap tampil)
      */
-    public function handle(PurchaseRequest $purchaseRequest, ?string $status, ?string $adminNote): PurchaseRequest
+    public function handle(PurchaseRequest $purchaseRequest, ?string $status, ?string $adminNote = null): PurchaseRequest
     {
         return DB::transaction(function () use ($purchaseRequest, $status, $adminNote) {
             $locked = PurchaseRequest::whereKey($purchaseRequest->id)->lockForUpdate()->firstOrFail();
@@ -58,19 +58,24 @@ class ChangePurchaseRequestStatus
         $car = Car::whereKey($purchaseRequest->car_id)->lockForUpdate()->firstOrFail();
 
         if ($status === PurchaseRequest::STATUS_APPROVED) {
-            if ($car->stock < 1) {
+            if (auth()->check() && ! auth()->user()->can('purchases.approve')) {
+                throw new DomainException('Hanya Admin Dealer dan Super Admin yang berwenang menyetujui pengajuan pembelian.');
+            }
+
+            if ($car->stock < 1 || ! $car->isColorInStock($purchaseRequest->color)) {
+                $colorNotice = $purchaseRequest->color ? " untuk warna \"{$purchaseRequest->color}\"" : '';
                 throw new DomainException(
-                    "Stok mobil \"{$car->name} {$car->year}\" habis, pengajuan tidak bisa disetujui."
+                    "Stok mobil \"{$car->name} {$car->year}\"{$colorNotice} habis, pengajuan tidak bisa disetujui."
                 );
             }
 
-            $car->decrement('stock');
+            $car->decrementColorStock($purchaseRequest->color);
             // Dasar batas pembayaran pertama (PurchaseRequest::paymentDueAt).
             $purchaseRequest->approved_at = now();
         } elseif ($purchaseRequest->status === PurchaseRequest::STATUS_APPROVED
             && in_array($status, [PurchaseRequest::STATUS_REJECTED, PurchaseRequest::STATUS_CANCELLED], true)) {
             // Unit yang sudah dipesan dikembalikan ke stok.
-            $car->increment('stock');
+            $car->incrementColorStock($purchaseRequest->color);
         }
 
         $purchaseRequest->status = $status;

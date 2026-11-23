@@ -15,8 +15,12 @@
     $popularServices = $report->servicesByPopularity();
     $byBrand = $report->salesByBrand();
     $byCategory = $report->salesByCategory();
+    $bySales = $report->salesByStaff();
+    $mechanics = $report->mechanicPerformance();
     $topCars = $report->topCars();
+    $topParts = $report->topSpareParts();
     $lowStock = $report->lowStockCars();
+    $lowStockParts = $report->lowStockSpareParts();
     $rupiah = fn (int $amount) => 'Rp '.number_format($amount, 0, ',', '.');
     $percentLabel = fn (float $value) => number_format($value, 1, ',', '.').'%';
 @endphp
@@ -89,11 +93,21 @@
         </span>
     </div>
 
-    <div class="row row-cols-1 row-cols-sm-2 row-cols-xl-4 g-3 mb-4">
+    <div @class([
+        'row g-3 mb-4',
+        'row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-xl-5' => auth()->user()->can('reports.revenue'),
+        'row-cols-1 row-cols-sm-2 row-cols-xl-4' => ! auth()->user()->can('reports.revenue'),
+    ])>
         <div class="col"><x-stat-card label="Total Pengajuan" :value="$purchases['total']" icon="bi-file-earmark-text" color="navy" /></div>
         <div class="col"><x-stat-card label="Unit Terjual" :value="$purchases['units_sold']" icon="bi-bag-check" color="green" /></div>
-        <div class="col"><x-stat-card label="Nilai Penjualan" :value="$rupiah($purchases['sales_value'])" icon="bi-cash-stack" color="red" /></div>
+        @can('reports.revenue')
+            <div class="col"><x-stat-card label="Nilai Penjualan" :value="$rupiah($purchases['sales_value'])" icon="bi-cash-stack" color="red" /></div>
+            <div class="col"><x-stat-card label="Pendapatan Servis" :value="$rupiah($report->serviceRevenue())" icon="bi-wrench" color="yellow" /></div>
+        @endcan
         <div class="col"><x-stat-card label="Test Drive Selesai" :value="$percentLabel($testDrives['completion_rate'])" icon="bi-calendar-check" color="blue" /></div>
+        @cannot('reports.revenue')
+            <div class="col"><x-stat-card label="Servis Selesai" :value="$percentLabel($services['completion_rate'])" icon="bi-wrench-adjustable" color="dark" /></div>
+        @endcannot
     </div>
 
     <div class="row g-4 mb-4">
@@ -150,8 +164,10 @@
                     <dl class="row small mb-0">
                         <dt class="col-7 text-muted fw-normal">Unit terjual</dt>
                         <dd class="col-5 text-end">{{ $purchases['units_sold'] }}</dd>
-                        <dt class="col-7 text-muted fw-normal mb-0">Nilai penjualan</dt>
-                        <dd class="col-5 text-end fw-semibold mb-0"><x-price :amount="$purchases['sales_value']" /></dd>
+                        @can('reports.revenue')
+                            <dt class="col-7 text-muted fw-normal mb-0">Nilai penjualan</dt>
+                            <dd class="col-5 text-end fw-semibold mb-0"><x-price :amount="$purchases['sales_value']" /></dd>
+                        @endcan
                     </dl>
                 </div>
             </div>
@@ -172,8 +188,10 @@
                                     <tr>
                                         <th>{{ $column }}</th>
                                         <th class="text-center">Unit</th>
-                                        <th class="text-end">Nilai</th>
-                                        <th style="width: 30%">Porsi nilai</th>
+                                        @can('reports.revenue')
+                                            <th class="text-end">Nilai</th>
+                                            <th style="width: 30%">Porsi nilai</th>
+                                        @endcan
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -182,11 +200,13 @@
                                         <tr>
                                             <td>{{ $row->name }}</td>
                                             <td class="text-center">{{ $row->units }}</td>
-                                            <td class="text-end"><x-price :amount="$row->value" /></td>
-                                            <td>
-                                                @include('admin.reports._bar', ['value' => $share])
-                                                <div class="small text-muted">{{ $percentLabel($share) }}</div>
-                                            </td>
+                                            @can('reports.revenue')
+                                                <td class="text-end"><x-price :amount="$row->value" /></td>
+                                                <td>
+                                                    @include('admin.reports._bar', ['value' => $share])
+                                                    <div class="small text-muted">{{ $percentLabel($share) }}</div>
+                                                </td>
+                                            @endcan
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -201,6 +221,46 @@
     <div class="row g-4 mb-4">
         <div class="col-lg-6">
             <div class="card h-100 report-card">
+                <div class="card-header bg-transparent border-0 pt-3 px-3"><h3 class="h6 mb-0">Penjualan per Sales</h3></div>
+                @if ($bySales->isEmpty())
+                    <x-empty-state icon="bi-person-badge" title="Belum ada penjualan" message="Tidak ada unit terjual pada periode ini." />
+                @else
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0 admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Sales</th>
+                                    <th class="text-center">Unit</th>
+                                    @can('reports.revenue')
+                                        <th class="text-end">Nilai</th>
+                                        <th style="width: 30%">Porsi nilai</th>
+                                    @endcan
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($bySales as $row)
+                                    @php($share = AdminReport::percent($row->value, $purchases['sales_value']))
+                                    <tr>
+                                        <td>{{ $row->name }}</td>
+                                        <td class="text-center">{{ $row->units }}</td>
+                                        @can('reports.revenue')
+                                            <td class="text-end"><x-price :amount="$row->value" /></td>
+                                            <td>
+                                                @include('admin.reports._bar', ['value' => $share])
+                                                <div class="small text-muted">{{ $percentLabel($share) }}</div>
+                                            </td>
+                                        @endcan
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card h-100 report-card">
                 <div class="card-header bg-transparent border-0 pt-3 px-3"><h3 class="h6 mb-0">5 Mobil Terlaris</h3></div>
                 @if ($topCars->isEmpty())
                     <x-empty-state icon="bi-trophy" title="Belum ada penjualan" message="Tidak ada unit terjual pada periode ini." />
@@ -212,7 +272,9 @@
                                     <th class="text-center" style="width: 50px">#</th>
                                     <th>Mobil</th>
                                     <th class="text-center">Unit</th>
-                                    <th class="text-end">Nilai</th>
+                                    @can('reports.revenue')
+                                        <th class="text-end">Nilai</th>
+                                    @endcan
                                 </tr>
                             </thead>
                             <tbody>
@@ -221,7 +283,9 @@
                                         <td class="text-center text-muted">{{ $loop->iteration }}</td>
                                         <td>{{ $car->name }}</td>
                                         <td class="text-center">{{ $car->units }}</td>
-                                        <td class="text-end"><x-price :amount="$car->value" /></td>
+                                        @can('reports.revenue')
+                                            <td class="text-end"><x-price :amount="$car->value" /></td>
+                                        @endcan
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -230,7 +294,9 @@
                 @endif
             </div>
         </div>
+    </div>
 
+    <div class="row g-4 mb-4">
         <div class="col-lg-6">
             <div class="card h-100 report-card">
                 <div class="card-header bg-transparent border-0 pt-3 px-3 d-flex justify-content-between align-items-center">
@@ -265,9 +331,7 @@
                 @endif
             </div>
         </div>
-    </div>
 
-    <div class="row g-4 mb-4">
         <div class="col-lg-6">
             <div class="card h-100 report-card">
                 <div class="card-header bg-transparent border-0 pt-3 px-3 d-flex justify-content-between align-items-center">
@@ -302,7 +366,9 @@
                 @endif
             </div>
         </div>
+    </div>
 
+    <div class="row g-4 mb-4">
         <div class="col-lg-6">
             <div class="card h-100 report-card">
                 <div class="card-header bg-transparent border-0 pt-3 px-3"><h3 class="h6 mb-0">Layanan Servis Terpopuler</h3></div>
@@ -334,11 +400,99 @@
                 @endif
             </div>
         </div>
+
+        <div class="col-lg-6">
+            <div class="card h-100 report-card">
+                <div class="card-header bg-transparent border-0 pt-3 px-3 d-flex justify-content-between align-items-center">
+                    <h3 class="h6 mb-0">Kinerja Mekanik & Rating</h3>
+                    <span class="small text-muted">{{ $mechanics->count() }} mekanik</span>
+                </div>
+                @if ($mechanics->isEmpty())
+                    <x-empty-state icon="bi-wrench" title="Belum ada servis selesai" message="Tidak ada pengerjaan servis selesai pada periode ini." />
+                @else
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0 admin-table">
+                            <thead>
+                                <tr>
+                                    <th class="text-center" style="width: 50px">#</th>
+                                    <th>Mekanik</th>
+                                    <th class="text-center">Selesai</th>
+                                    <th class="text-center">Ulasan</th>
+                                    <th class="text-end">Rating</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($mechanics as $mechanic)
+                                    <tr>
+                                        <td class="text-center text-muted">{{ $loop->iteration }}</td>
+                                        <td>{{ $mechanic->name }}</td>
+                                        <td class="text-center">{{ $mechanic->completed }}</td>
+                                        <td class="text-center">{{ $mechanic->reviews_count }}</td>
+                                        <td class="text-end">
+                                            @if ($mechanic->avg_rating !== null)
+                                                <span class="text-warning"><i class="bi bi-star-fill"></i></span>
+                                                <span class="fw-semibold">{{ number_format($mechanic->avg_rating, 1, ',', '.') }}</span>
+                                            @else
+                                                <span class="text-muted">-</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+
+    {{-- Suku Cadang Terpopuler di Bengkel --}}
+    <div class="row g-4 mb-4">
+        <div class="col-12">
+            <div class="card h-100 report-card">
+                <div class="card-header bg-transparent border-0 pt-3 px-3 d-flex justify-content-between align-items-center">
+                    <h3 class="h6 mb-0">Suku Cadang Terpopuler di Bengkel</h3>
+                    <span class="small text-muted">Dipasang pada booking servis selesai dalam periode</span>
+                </div>
+                @if ($topParts->isEmpty())
+                    <x-empty-state icon="bi-tools" title="Belum ada suku cadang terpasang" message="Tidak ada suku cadang yang digunakan pada servis selesai di periode ini." />
+                @else
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0 admin-table">
+                            <thead>
+                                <tr>
+                                    <th class="text-center" style="width: 50px">#</th>
+                                    <th>Suku Cadang</th>
+                                    <th>Nomor SKU</th>
+                                    <th class="text-center">Unit Terpakai</th>
+                                    @can('reports.revenue')
+                                        <th class="text-end">Nilai (Rp)</th>
+                                    @endcan
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($topParts as $part)
+                                    <tr>
+                                        <td class="text-center text-muted">{{ $loop->iteration }}</td>
+                                        <td class="fw-semibold">{{ $part->part_name }}</td>
+                                        <td><code>{{ $part->part_number }}</code></td>
+                                        <td class="text-center">{{ $part->units }}</td>
+                                        @can('reports.revenue')
+                                            <td class="text-end fw-semibold text-accent">{{ $rupiah($part->value) }}</td>
+                                        @endcan
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+        </div>
     </div>
 
     <div class="card report-card">
         <div class="card-header bg-transparent border-0 pt-3 px-3 d-flex justify-content-between align-items-center">
-            <h3 class="h6 mb-0">Stok Menipis</h3>
+            <h3 class="h6 mb-0">Stok Menipis (Mobil)</h3>
             <span class="small text-muted">Mobil aktif dengan stok ≤ {{ Car::LOW_STOCK_THRESHOLD }} (saat ini, tidak bergantung periode)</span>
         </div>
         @if ($lowStock->isEmpty())
@@ -369,6 +523,54 @@
                                 <td class="text-end d-print-none">
                                     <a href="{{ route('admin.cars.edit', $car) }}" class="btn btn-sm btn-outline-primary">
                                         <i class="bi bi-pencil-square"></i>Edit
+                                    </a>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </div>
+
+    {{-- Suku Cadang Stok Menipis --}}
+    <div class="card report-card mt-4">
+        <div class="card-header bg-transparent border-0 pt-3 px-3 d-flex justify-content-between align-items-center">
+            <h3 class="h6 mb-0">Suku Cadang Stok Menipis</h3>
+            <span class="small text-muted">Suku cadang aktif dengan stok ≤ batas minimum (saat ini, tidak bergantung periode)</span>
+        </div>
+        @if ($lowStockParts->isEmpty())
+            <x-empty-state icon="bi-check2-circle" title="Stok suku cadang aman" message="Semua suku cadang aktif memiliki stok di atas batas minimum." />
+        @else
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 admin-table">
+                    <thead>
+                        <tr>
+                            <th>Suku Cadang</th>
+                            <th>Nomor SKU</th>
+                            <th>Kategori</th>
+                            <th class="text-center">Sisa Stok</th>
+                            <th class="text-center">Batas Minimum</th>
+                            <th class="text-end d-print-none">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($lowStockParts as $part)
+                            <tr>
+                                <td class="fw-medium">{{ $part->name }}</td>
+                                <td><code>{{ $part->part_number }}</code></td>
+                                <td>{{ $part->categoryLabel() }}</td>
+                                <td class="text-center">
+                                    @if ($part->isOutOfStock())
+                                        <span class="badge bg-danger">Habis</span>
+                                    @else
+                                        <span class="badge bg-warning text-dark">{{ $part->stock }} {{ $part->unit }}</span>
+                                    @endif
+                                </td>
+                                <td class="text-center text-muted">{{ $part->min_stock }} {{ $part->unit }}</td>
+                                <td class="text-end d-print-none">
+                                    <a href="{{ route('admin.spare-parts.edit', $part) }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-pencil-square"></i>Edit Stok
                                     </a>
                                 </td>
                             </tr>

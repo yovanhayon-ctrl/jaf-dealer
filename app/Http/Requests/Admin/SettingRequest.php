@@ -22,8 +22,11 @@ class SettingRequest extends FormRequest
 
     public const MAX_KILOBYTES = 8192;
 
+    public const MAX_VIDEO_KILOBYTES = 20480;
+
     public const HERO_BACKGROUNDS = [
         'video' => 'Video',
+        'showcase' => 'Showcase Mobil 360°',
         'image' => 'Gambar banner',
         'car' => 'Foto mobil unggulan',
     ];
@@ -108,6 +111,12 @@ class SettingRequest extends FormRequest
                     ->dimensions(Rule::dimensions()->minWidth(1200)->minHeight(500)->maxWidth(8000)->maxHeight(8000)),
             ],
             'remove_hero_image' => ['nullable', 'boolean'],
+            'hero_showcase_video' => [
+                'nullable',
+                File::types(['mp4', 'webm'])
+                    ->max(self::MAX_VIDEO_KILOBYTES),
+            ],
+            'remove_hero_showcase_video' => ['nullable', 'boolean'],
         ];
     }
 
@@ -177,6 +186,7 @@ class SettingRequest extends FormRequest
             'hero_lead' => 'teks di bawah judul',
             'hero_background' => 'latar hero',
             'hero_image' => 'gambar banner',
+            'hero_showcase_video' => 'video showcase',
         ];
     }
 
@@ -193,6 +203,8 @@ class SettingRequest extends FormRequest
             'hero_image.mimes' => 'Gambar banner harus berupa JPG, JPEG, PNG, atau WEBP.',
             'hero_image.max' => 'Ukuran gambar banner maksimal '.intdiv(self::MAX_KILOBYTES, 1024).' MB.',
             'hero_image.dimensions' => 'Gambar banner minimal berukuran 1200×500 piksel dan maksimal 8000×8000 piksel.',
+            'hero_showcase_video.mimes' => 'Video showcase harus berupa MP4 atau WEBM.',
+            'hero_showcase_video.max' => 'Ukuran video showcase maksimal '.intdiv(self::MAX_VIDEO_KILOBYTES, 1024).' MB.',
         ];
     }
 }

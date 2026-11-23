@@ -58,7 +58,7 @@ class AdminNotificationTest extends TestCase
     private function bookTestDrive(): void
     {
         $this->actingAs($this->customer)->post(route('test-drives.store'), [
-            'car_id' => $this->car->id, 'preferred_date' => '2026-10-12', 'preferred_time' => '10:00', 'phone' => '081234567890',
+            'car_id' => $this->car->id, 'preferred_date' => '2026-10-12', 'preferred_time' => '10:00', 'phone' => '081234567890', 'has_sim' => '1',
         ])->assertSessionHasNoErrors();
     }
 

@@ -22,7 +22,7 @@ class Setting extends Model
     public const KEYS = [
         'name', 'tagline', 'address', 'phone', 'whatsapp', 'email', 'hours', 'maps_embed_url', 'about_text',
         'bank.name', 'bank.account', 'bank.holder',
-        'hero.kicker', 'hero.title', 'hero.lead', 'hero.background', 'hero.image',
+        'hero.kicker', 'hero.title', 'hero.lead', 'hero.background', 'hero.image', 'hero.showcase_video',
     ];
 
     public const BANK_KEYS = ['bank.name', 'bank.account', 'bank.holder'];

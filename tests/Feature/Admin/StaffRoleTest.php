@@ -51,13 +51,13 @@ class StaffRoleTest extends TestCase
         // route => status untuk owner, admin, mekanik, customer
         return [
             'dashboard admin' => ['admin.dashboard', 200, 200, 403, 403],
-            'kelola staf' => ['admin.staff.index', 200, 403, 403, 403],
-            'tambah staf' => ['admin.staff.create', 200, 403, 403, 403],
-            // v1.14.0: Admin Dealer kembali mengelola merek & kategori (hapus tetap owner/super admin).
-            'daftar merek' => ['admin.brands.index', 200, 200, 403, 403],
-            'tambah merek' => ['admin.brands.create', 200, 200, 403, 403],
-            'daftar kategori' => ['admin.categories.index', 200, 200, 403, 403],
-            'tambah kategori' => ['admin.categories.create', 200, 200, 403, 403],
+            'kelola staf' => ['admin.staff.index', 403, 200, 403, 403],
+            'tambah staf' => ['admin.staff.create', 403, 200, 403, 403],
+            // Owner hanya dashboard, laporan, pengaturan (merek & kategori 403).
+            'daftar merek' => ['admin.brands.index', 403, 200, 403, 403],
+            'tambah merek' => ['admin.brands.create', 403, 200, 403, 403],
+            'daftar kategori' => ['admin.categories.index', 403, 200, 403, 403],
+            'tambah kategori' => ['admin.categories.create', 403, 200, 403, 403],
             'laporan' => ['admin.reports.index', 200, 200, 403, 403],
             'pekerjaan mekanik' => ['mechanic.jobs.index', 403, 403, 200, 403],
         ];
@@ -74,7 +74,7 @@ class StaffRoleTest extends TestCase
         $this->get(route($route))->assertRedirect(route('login'));
     }
 
-    public function test_admin_dealer_tidak_bisa_menghapus_data_master(): void
+    public function test_admin_dealer_bisa_menghapus_data_master_dan_owner_hanya_lihat(): void
     {
         $car = Car::factory()->create();
         $brand = Brand::factory()->create();
@@ -82,7 +82,8 @@ class StaffRoleTest extends TestCase
         $promo = Promo::factory()->create();
         $service = Service::factory()->create();
 
-        $this->actingAs($this->admin);
+        // Owner hanya lihat (L) sesuai matriks: dilarang menghapus data master.
+        $this->actingAs($this->owner);
         foreach ([
             route('admin.cars.destroy', $car), route('admin.brands.destroy', $brand), route('admin.categories.destroy', $category),
             route('admin.promos.destroy', $promo), route('admin.services.destroy', $service),
@@ -93,13 +94,14 @@ class StaffRoleTest extends TestCase
             $this->assertModelExists($model);
         }
 
-        // Admin Dealer tetap bisa membuka daftar & form ubah serta laporan, tanpa tombol hapus.
-        $this->get(route('admin.services.index'))->assertOk()->assertDontSee('data-delete-url', false);
+        // Admin Dealer memegang operasional penuh (L T U H): bisa menghapus data master.
+        $this->actingAs($this->admin);
+        $this->get(route('admin.services.index'))->assertOk()->assertSee('data-delete-url', false);
         $this->get(route('admin.services.edit', $service))->assertOk();
         $this->get(route('admin.dashboard'))->assertSee(route('admin.reports.index'), false);
 
-        // Owner melihat tombol hapus.
-        $this->actingAs($this->owner)->get(route('admin.services.index'))->assertSee('data-delete-url', false);
+        $this->delete(route('admin.brands.destroy', $brand))->assertRedirect(route('admin.brands.index'));
+        $this->assertModelMissing($brand);
     }
 
     public function test_admin_dealer_mengelola_merek_dan_kategori(): void
@@ -139,10 +141,11 @@ class StaffRoleTest extends TestCase
     public function test_menu_panel_sesuai_role(): void
     {
         $this->actingAs($this->owner)->get(route('admin.dashboard'))
-            ->assertSee(route('admin.staff.index'), false)
+            ->assertDontSee(route('admin.staff.index'), false)
+            ->assertDontSee(route('admin.notifications.index'), false)
             ->assertSee('Pak Hendra (Owner)');
 
-        $this->actingAs($this->admin)->get(route('admin.dashboard'))->assertDontSee(route('admin.staff.index'), false);
+        $this->actingAs($this->admin)->get(route('admin.dashboard'))->assertSee(route('admin.staff.index'), false);
 
         $this->actingAs($this->mechanic)->get(route('mechanic.jobs.index'))
             ->assertSee('Pekerjaan Saya')
@@ -151,9 +154,9 @@ class StaffRoleTest extends TestCase
             ->assertDontSee(route('admin.notifications.index'), false);
     }
 
-    public function test_owner_menambah_mekanik_yang_bisa_login(): void
+    public function test_admin_menambah_mekanik_yang_bisa_login(): void
     {
-        $this->actingAs($this->owner)->post(route('admin.staff.store'), [
+        $this->actingAs($this->admin)->post(route('admin.staff.store'), [
             'name' => 'Budi Mekanik', 'email' => 'Budi@Dealer.test', 'phone' => '0812 3456 7890', 'role' => 'mechanic',
             'password' => 'rahasia123', 'password_confirmation' => 'rahasia123',
         ])->assertRedirect(route('admin.staff.index'))
@@ -187,44 +190,47 @@ class StaffRoleTest extends TestCase
     #[DataProvider('invalidStaff')]
     public function test_validasi_tambah_staf(array $overrides, string $field): void
     {
-        $this->actingAs($this->owner)->post(route('admin.staff.store'), [
-            'name' => 'Staf Baru', 'email' => 'baru@dealer.test', 'role' => 'admin',
+        $this->actingAs($this->admin)->post(route('admin.staff.store'), [
+            'name' => 'Staf Baru', 'email' => 'baru@dealer.test', 'role' => 'sales',
             'password' => 'rahasia123', 'password_confirmation' => 'rahasia123', ...$overrides,
         ])->assertSessionHasErrors($field);
 
         $this->assertSame(4, User::count());
     }
 
-    public function test_admin_dan_mekanik_tidak_bisa_mengelola_staf(): void
+    public function test_mekanik_tidak_bisa_mengelola_staf(): void
     {
         $payload = ['name' => 'Penyusup', 'email' => 'x@dealer.test', 'role' => 'admin', 'password' => 'rahasia123', 'password_confirmation' => 'rahasia123'];
 
-        $this->actingAs($this->admin)->post(route('admin.staff.store'), $payload)->assertForbidden();
-        $this->actingAs($this->admin)->put(route('admin.staff.update', $this->mechanic), $payload)->assertForbidden();
         $this->actingAs($this->mechanic)->post(route('admin.staff.store'), $payload)->assertForbidden();
+        $this->actingAs($this->mechanic)->put(route('admin.staff.update', $this->mechanic), $payload)->assertForbidden();
 
         $this->assertSame(4, User::count());
     }
 
     public function test_owner_dan_customer_tidak_bisa_diubah_lewat_menu_staf(): void
     {
-        $this->actingAs($this->owner)->get(route('admin.staff.edit', $this->owner))->assertNotFound();
-        $this->actingAs($this->owner)->get(route('admin.staff.edit', $this->customer))->assertNotFound();
-        $this->actingAs($this->owner)->put(route('admin.staff.update', $this->owner), [
+        $this->actingAs($this->admin)->get(route('admin.staff.edit', $this->owner))->assertNotFound();
+        $this->actingAs($this->admin)->get(route('admin.staff.edit', $this->customer))->assertNotFound();
+        $this->actingAs($this->admin)->put(route('admin.staff.update', $this->owner), [
             'name' => 'Pak Hendra', 'email' => 'owner@dealer.test', 'role' => 'mechanic',
         ])->assertNotFound();
 
         $this->assertTrue($this->owner->fresh()->isOwner());
+
+        // Owner sendiri tidak memiliki akses menu staf
+        $this->actingAs($this->owner)->get(route('admin.staff.index'))->assertForbidden();
+        $this->actingAs($this->owner)->get(route('admin.staff.edit', $this->mechanic))->assertForbidden();
     }
 
-    public function test_owner_mengubah_role_dan_menonaktifkan_staf(): void
+    public function test_admin_mengubah_role_dan_menonaktifkan_staf(): void
     {
-        $this->actingAs($this->owner)->put(route('admin.staff.update', $this->mechanic), [
-            'name' => 'Joko Santoso', 'email' => 'joko@dealer.test', 'role' => 'admin', 'is_active' => '1',
+        $this->actingAs($this->admin)->put(route('admin.staff.update', $this->mechanic), [
+            'name' => 'Joko Santoso', 'email' => 'joko@dealer.test', 'role' => 'sales', 'is_active' => '1',
         ])->assertSessionHasNoErrors();
 
         $joko = $this->mechanic->fresh();
-        $this->assertTrue($joko->isAdmin());
+        $this->assertTrue($joko->isSales());
         $this->assertSame('Joko Santoso', $joko->name);
         $this->assertTrue(Hash::check('password', $joko->password), 'Kata sandi kosong = tidak diganti.');
 
@@ -262,7 +268,8 @@ class StaffRoleTest extends TestCase
 
         AdminActivityNotification::notifyAdmins(new TestDriveActivity($testDrive));
 
-        $this->assertSame(1, $this->owner->notifications()->count());
+        // Test drive dikelola Admin Dealer (Owner hanya lihat, tidak menerima notifikasi kelola test drive)
+        $this->assertSame(0, $this->owner->notifications()->count());
         $this->assertSame(1, $this->admin->notifications()->count());
         $this->assertSame(0, $this->mechanic->notifications()->count());
         $this->assertSame(0, $inactiveAdmin->notifications()->count());

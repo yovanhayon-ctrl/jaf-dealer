@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\MechanicRating;
 use App\Models\Testimonial;
 use App\Notifications\Notifier;
 use App\Notifications\TestimonialModerated;
@@ -11,7 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
- * Moderasi ulasan customer: setujui (tampil di beranda) atau tolak dengan alasan.
+ * Moderasi & kelola ulasan customer: ulasan pembelian mobil dan ulasan servis mekanik.
  */
 class TestimonialController extends Controller
 {
@@ -19,6 +20,39 @@ class TestimonialController extends Controller
 
     public function index(Request $request): View
     {
+        $tipe = $request->query('tipe') === 'servis' ? 'servis' : 'mobil';
+
+        $totalCarTestimonials = Testimonial::count();
+        $totalServiceRatings = MechanicRating::count();
+
+        if ($tipe === 'servis') {
+            $rating = in_array((int) $request->query('rating'), [1, 2, 3, 4, 5], true)
+                ? (int) $request->query('rating')
+                : null;
+
+            $ratings = MechanicRating::query()
+                ->with([
+                    'user:id,name,email',
+                    'mechanic:id,name',
+                    'booking:id,service_id,plate_number,vehicle_model',
+                    'booking.service:id,name',
+                ])
+                ->when($rating !== null, fn ($query) => $query->where('rating', $rating))
+                ->latest()
+                ->orderByDesc('id')
+                ->paginate(self::PER_PAGE)
+                ->withQueryString();
+
+            return view('admin.testimonials.index', [
+                'tipe' => $tipe,
+                'mechanicRatings' => $ratings,
+                'selectedRating' => $rating,
+                'ratingCounts' => MechanicRating::query()->selectRaw('rating, COUNT(*) AS total')->groupBy('rating')->pluck('total', 'rating'),
+                'totalCarTestimonials' => $totalCarTestimonials,
+                'totalServiceRatings' => $totalServiceRatings,
+            ]);
+        }
+
         $status = in_array($request->query('status'), Testimonial::STATUSES, true) ? $request->query('status') : null;
 
         $testimonials = Testimonial::query()
@@ -35,9 +69,12 @@ class TestimonialController extends Controller
             ->withQueryString();
 
         return view('admin.testimonials.index', [
+            'tipe' => $tipe,
             'testimonials' => $testimonials,
             'status' => $status,
             'counts' => Testimonial::query()->selectRaw('status, COUNT(*) AS total')->groupBy('status')->pluck('total', 'status'),
+            'totalCarTestimonials' => $totalCarTestimonials,
+            'totalServiceRatings' => $totalServiceRatings,
         ]);
     }
 

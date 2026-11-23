@@ -104,28 +104,60 @@ class ServiceBookingMechanicChoiceTest extends TestCase
         $this->assertSame(0, ServiceBooking::count());
     }
 
-    public function test_mekanik_yang_sudah_ada_jadwal_di_jam_itu_ditolak(): void
+    public function test_mekanik_yang_sedang_ada_pengerjaan_aktif_ditolak(): void
     {
         ServiceBooking::factory()->create([
             'status' => ServiceBooking::STATUS_CONFIRMED, 'mechanic_id' => $this->mechanic->id,
             'preferred_date' => '2026-10-12', 'preferred_time' => '09:00', 'plate_number' => 'D 1 X',
         ]);
 
-        $this->book()->assertSessionHasErrors(['mechanic_id' => 'Joko Prasetyo sudah ada jadwal di jam itu. Pilih jam lain atau mekanik lain.']);
+        // Tanggal / jam sama ditolak
+        $this->book()->assertSessionHasErrors([
+            'mechanic_id' => 'Joko Prasetyo masih memiliki pengerjaan servis yang belum selesai. Silakan pilih mekanik lain atau biarkan dipilihkan bengkel.',
+        ]);
 
-        // Jam lain atau tanpa mekanik tetap boleh.
-        $this->book(['preferred_time' => '10:00'])->assertSessionHasNoErrors();
+        // Tanggal / jam lain juga tetap ditolak selama booking belum selesai
+        $this->book(['preferred_date' => '2026-10-15', 'preferred_time' => '10:00'])
+            ->assertSessionHasErrors([
+                'mechanic_id' => 'Joko Prasetyo masih memiliki pengerjaan servis yang belum selesai. Silakan pilih mekanik lain atau biarkan dipilihkan bengkel.',
+            ]);
+
+        // Tanpa memilih mekanik (dipilihkan bengkel) tetap boleh.
+        $this->book(['mechanic_id' => ''])->assertSessionHasNoErrors();
         $this->assertSame(2, ServiceBooking::count());
     }
 
     public function test_booking_selesai_atau_batal_tidak_dihitung_bentrok(): void
     {
         ServiceBooking::factory()->create([
+            'status' => ServiceBooking::STATUS_COMPLETED, 'mechanic_id' => $this->mechanic->id,
+            'preferred_date' => '2026-10-10', 'preferred_time' => '09:00', 'plate_number' => 'D 1 X',
+        ]);
+
+        ServiceBooking::factory()->create([
             'status' => ServiceBooking::STATUS_CANCELLED, 'mechanic_id' => $this->mechanic->id,
-            'preferred_date' => '2026-10-12', 'preferred_time' => '09:00', 'plate_number' => 'D 1 X',
+            'preferred_date' => '2026-10-11', 'preferred_time' => '09:00', 'plate_number' => 'D 2 Y',
         ]);
 
         $this->book()->assertSessionHasNoErrors();
+    }
+
+    public function test_form_menandai_mekanik_sibuk_sebagai_disabled(): void
+    {
+        ServiceBooking::factory()->create([
+            'status' => ServiceBooking::STATUS_IN_PROGRESS, 'mechanic_id' => $this->mechanic->id,
+            'preferred_date' => '2026-10-12', 'preferred_time' => '09:00', 'plate_number' => 'D 1 X',
+        ]);
+
+        $availableMechanic = User::factory()->mechanic()->create(['name' => 'Budi Santoso']);
+
+        $response = $this->actingAs($this->customer)->get(route('service-bookings.create'));
+
+        $response->assertOk()
+            ->assertSee('Joko Prasetyo (Sedang ada pengerjaan)')
+            ->assertSee('Budi Santoso')
+            ->assertDontSee('Budi Santoso (Sedang ada pengerjaan)')
+            ->assertSee('<option value="'.$this->mechanic->id.'" disabled>Joko Prasetyo (Sedang ada pengerjaan)</option>', false);
     }
 
     public function test_admin_mengganti_mekanik_pilihan_customer(): void

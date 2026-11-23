@@ -11,15 +11,16 @@
     ];
     $menu = [
         ['label' => 'Dashboard', 'icon' => 'bi-speedometer2', 'route' => 'admin.dashboard', 'active' => 'admin.dashboard'],
-        ['label' => 'Notifikasi', 'icon' => 'bi-bell', 'route' => 'admin.notifications.index', 'active' => 'admin.notifications.*', 'badge' => $adminUnreadNotifications ?? 0],
+        ['label' => 'Notifikasi', 'icon' => 'bi-bell', 'route' => 'admin.notifications.index', 'active' => 'admin.notifications.*', 'can' => 'notifications.view', 'badge' => $adminUnreadNotifications ?? 0],
         ['label' => 'Mobil', 'icon' => 'bi-car-front', 'route' => 'admin.cars.index', 'active' => 'admin.cars.*', 'can' => 'cars.view'],
-        ['label' => 'Merek', 'icon' => 'bi-tags', 'route' => 'admin.brands.index', 'active' => 'admin.brands.*', 'can' => 'catalog.manage'],
-        ['label' => 'Kategori', 'icon' => 'bi-grid', 'route' => 'admin.categories.index', 'active' => 'admin.categories.*', 'can' => 'catalog.manage'],
+        ['label' => 'Merek', 'icon' => 'bi-tags', 'route' => 'admin.brands.index', 'active' => 'admin.brands.*', 'can' => 'brands.view'],
+        ['label' => 'Kategori', 'icon' => 'bi-grid', 'route' => 'admin.categories.index', 'active' => 'admin.categories.*', 'can' => 'categories.view'],
         ['label' => 'Promo', 'icon' => 'bi-percent', 'route' => 'admin.promos.index', 'active' => 'admin.promos.*', 'can' => 'promos.view'],
         ['label' => 'Test Drive', 'icon' => 'bi-calendar-check', 'route' => 'admin.test-drives.index', 'active' => 'admin.test-drives.*', 'can' => 'test-drives.view'],
         ['label' => 'Pengajuan', 'icon' => 'bi-file-earmark-text', 'route' => 'admin.purchase-requests.index', 'active' => 'admin.purchase-requests.*', 'can' => 'purchases.view'],
-        ['label' => 'Booking Servis', 'icon' => 'bi-wrench-adjustable', 'route' => 'admin.service-bookings.index', 'active' => 'admin.service-bookings.*', 'can' => 'service-bookings.manage'],
-        ['label' => 'Layanan Servis', 'icon' => 'bi-tools', 'route' => 'admin.services.index', 'active' => 'admin.services.*', 'can' => 'services.manage'],
+        ['label' => 'Booking Servis', 'icon' => 'bi-wrench-adjustable', 'route' => 'admin.service-bookings.index', 'active' => 'admin.service-bookings.*', 'can' => 'service-bookings.view'],
+        ['label' => 'Layanan Servis', 'icon' => 'bi-tools', 'route' => 'admin.services.index', 'active' => 'admin.services.*', 'can' => 'services.view'],
+        ['label' => 'Spare Part', 'icon' => 'bi-box-seam', 'route' => 'admin.spare-parts.index', 'active' => 'admin.spare-parts.*', 'can' => 'spare-parts.view'],
         ['label' => 'Ulasan', 'icon' => 'bi-star', 'route' => 'admin.testimonials.index', 'active' => 'admin.testimonials.*', 'can' => 'testimonials.view'],
         ['label' => 'Pengguna', 'icon' => 'bi-people', 'route' => 'admin.users.index', 'active' => 'admin.users.*', 'can' => 'users.view'],
         ['label' => 'Laporan', 'icon' => 'bi-bar-chart', 'route' => 'admin.reports.index', 'active' => 'admin.reports.*', 'can' => 'reports.view'],
@@ -52,9 +53,12 @@
                     @continue(! Route::has($item['route']))
 
                     @php($isActive = request()->routeIs($item['active']))
-                    <a @class(['nav-link', 'active' => $isActive]) href="{{ route($item['route']) }}" @if ($isActive) aria-current="page" @endif>
+                    @php($isNotificationItem = in_array($item['route'], ['admin.notifications.index', 'mechanic.notifications.index'], true))
+                    <a @class(['nav-link', 'active' => $isActive]) href="{{ route($item['route']) }}" @if ($isActive) aria-current="page" @endif @if ($isNotificationItem) data-notification-sidebar @endif>
                         <i class="bi {{ $item['icon'] }}"></i>{{ $item['label'] }}
-                        @if (! empty($item['badge']))
+                        @if ($isNotificationItem)
+                            <span class="badge rounded-pill bg-danger ms-auto{{ ! empty($item['badge']) ? '' : ' d-none' }}" data-notification-badge>{{ ($item['badge'] ?? 0) > 99 ? '99+' : ($item['badge'] ?? 0) }}<span class="visually-hidden"> belum dibaca</span></span>
+                        @elseif (! empty($item['badge']))
                             <span class="badge rounded-pill bg-danger ms-auto">{{ $item['badge'] > 99 ? '99+' : $item['badge'] }}<span class="visually-hidden"> belum dibaca</span></span>
                         @endif
                     </a>

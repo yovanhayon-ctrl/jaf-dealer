@@ -31,6 +31,28 @@ class ScheduleOverdueTest extends TestCase
     }
 
     /**
+     * @return array<string, array{class-string}>
+     */
+    public static function scheduleModels(): array
+    {
+        return [
+            'test drive' => [TestDrive::class],
+            'booking servis' => [ServiceBooking::class],
+        ];
+    }
+
+    /**
+     * @return array<string, array{class-string, string}>
+     */
+    public static function adminSchedules(): array
+    {
+        return [
+            'test drive' => [TestDrive::class, 'admin.test-drives.index'],
+            'booking servis' => [ServiceBooking::class, 'admin.service-bookings.index'],
+        ];
+    }
+
+    /**
      * @return array<string, array{class-string, string, string}>
      */
     public static function schedules(): array
@@ -52,7 +74,7 @@ class ScheduleOverdueTest extends TestCase
     /**
      * @param  class-string<TestDrive|ServiceBooking>  $model
      */
-    #[DataProvider('schedules')]
+    #[DataProvider('scheduleModels')]
     public function test_hanya_menunggu_atau_dikonfirmasi_sebelum_hari_ini(string $model): void
     {
         $pendingYesterday = $this->schedule($model, 'pending', '2026-10-14');
@@ -72,7 +94,7 @@ class ScheduleOverdueTest extends TestCase
     /**
      * @param  class-string<TestDrive|ServiceBooking>  $model
      */
-    #[DataProvider('schedules')]
+    #[DataProvider('adminSchedules')]
     public function test_admin_filter_dan_badge_lewat_jadwal(string $model, string $adminRoute): void
     {
         $overdue = $this->schedule($model, 'pending', '2026-10-14');

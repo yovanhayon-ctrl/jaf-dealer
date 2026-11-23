@@ -44,22 +44,34 @@ class DashboardTrend
             ->get()
             ->keyBy('month');
         $testDrives = $this->perMonth('test_drives')->selectRaw('COUNT(*) AS total')->pluck('total', 'month');
-        $serviceBookings = $this->perMonth('service_bookings')->selectRaw('COUNT(*) AS total')->pluck('total', 'month');
+        $serviceBookings = $this->perMonth('service_bookings')
+            ->selectRaw('COUNT(*) AS total')
+            ->selectRaw("COUNT(CASE WHEN status = 'completed' THEN 1 END) AS services_completed")
+            ->selectRaw("COALESCE(SUM(CASE WHEN status = 'completed' THEN service_price + COALESCE((SELECT SUM(subtotal) FROM service_booking_spare_parts WHERE service_booking_spare_parts.service_booking_id = service_bookings.id), 0) ELSE 0 END), 0) AS service_revenue")
+            ->get()
+            ->keyBy('month');
 
         $months = [];
 
         for ($month = $this->from; $month->lessThanOrEqualTo($this->to); $month = $month->addMonth()) {
             $key = $month->format('Y-m');
             $purchase = $purchases->get($key);
+            $service = $serviceBookings->get($key);
+
+            $salesVal = (int) ($purchase->sales_value ?? 0);
+            $serviceVal = (int) ($service->service_revenue ?? 0);
 
             $months[] = [
                 'key' => $key,
                 'label' => $month->translatedFormat('M Y'),
                 'purchases' => (int) ($purchase->total ?? 0),
                 'test_drives' => (int) ($testDrives[$key] ?? 0),
-                'service_bookings' => (int) ($serviceBookings[$key] ?? 0),
+                'service_bookings' => (int) ($service->total ?? 0),
                 'units_sold' => (int) ($purchase->units_sold ?? 0),
-                'sales_value' => (int) ($purchase->sales_value ?? 0),
+                'sales_value' => $salesVal,
+                'services_completed' => (int) ($service->services_completed ?? 0),
+                'service_revenue' => $serviceVal,
+                'total_revenue' => $salesVal + $serviceVal,
             ];
         }
 

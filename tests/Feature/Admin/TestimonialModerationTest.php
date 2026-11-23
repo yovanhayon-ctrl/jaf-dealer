@@ -4,7 +4,10 @@ namespace Tests\Feature\Admin;
 
 use App\Models\Brand;
 use App\Models\Car;
+use App\Models\MechanicRating;
 use App\Models\PurchaseRequest;
+use App\Models\Service;
+use App\Models\ServiceBooking;
 use App\Models\Testimonial;
 use App\Models\User;
 use App\Notifications\TestimonialModerated;
@@ -149,5 +152,58 @@ class TestimonialModerationTest extends TestCase
         Testimonial::factory()->count(5)->create();
 
         $this->assertSame($withOne, $count());
+    }
+
+    public function test_tab_ulasan_servis_menampilkan_rating_dan_filter_bintang(): void
+    {
+        $mechanic = User::factory()->mechanic()->create(['name' => 'Mekanik Bambang']);
+        $service = Service::factory()->create(['name' => 'Ganti Oli']);
+        $booking = ServiceBooking::factory()->recycle($this->customer)->recycle($service)->create([
+            'status' => ServiceBooking::STATUS_COMPLETED,
+            'mechanic_id' => $mechanic->id,
+            'plate_number' => 'B 9999 XYZ',
+            'vehicle_model' => 'Honda Jazz',
+        ]);
+
+        MechanicRating::factory()->create([
+            'service_booking_id' => $booking->id,
+            'mechanic_id' => $mechanic->id,
+            'user_id' => $this->customer->id,
+            'rating' => 5,
+            'comment' => 'Pekerjaan sangat rapi dan ramah.',
+        ]);
+
+        $booking2 = ServiceBooking::factory()->recycle($service)->create(['status' => ServiceBooking::STATUS_COMPLETED, 'mechanic_id' => $mechanic->id]);
+        MechanicRating::factory()->create([
+            'service_booking_id' => $booking2->id,
+            'mechanic_id' => $mechanic->id,
+            'user_id' => $this->customer->id,
+            'rating' => 3,
+            'comment' => 'Agak lama selesainya.',
+        ]);
+
+        // Buka tab servis
+        $this->actingAs($this->admin)->get(route('admin.testimonials.index', ['tipe' => 'servis']))
+            ->assertOk()
+            ->assertSee('Ulasan Servis Mekanik')
+            ->assertSee('Mekanik Bambang')
+            ->assertSee('B 9999 XYZ')
+            ->assertSee('Honda Jazz')
+            ->assertSee('Ganti Oli')
+            ->assertSee('Pekerjaan sangat rapi dan ramah.')
+            ->assertSee('Agak lama selesainya.');
+
+        // Filter bintang 5
+        $this->actingAs($this->admin)->get(route('admin.testimonials.index', ['tipe' => 'servis', 'rating' => 5]))
+            ->assertOk()
+            ->assertSee('Pekerjaan sangat rapi dan ramah.')
+            ->assertDontSee('Agak lama selesainya.');
+    }
+
+    public function test_tab_ulasan_servis_empty_state(): void
+    {
+        $this->actingAs($this->admin)->get(route('admin.testimonials.index', ['tipe' => 'servis']))
+            ->assertOk()
+            ->assertSee('Belum ada ulasan servis');
     }
 }

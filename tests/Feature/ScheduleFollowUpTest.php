@@ -216,8 +216,10 @@ class ScheduleFollowUpTest extends TestCase
             ->assertSee('badge-status-red ms-1">Belum ditanggapi</span>', false);
         $this->get(route('admin.dashboard'))->assertSee('<strong>1</strong> pengajuan belum ditanggapi', false);
 
-        // Sales memproses pengajuan: ikut melihat; Customer Service tidak.
-        $this->actingAs(User::factory()->sales()->create())->get(route('admin.dashboard'))->assertSee('pengajuan belum ditanggapi');
+        // Sales memproses pengajuan: ikut melihat pengajuan miliknya; Customer Service tidak.
+        $sales = User::factory()->sales()->create();
+        $old->update(['sales_id' => $sales->id]);
+        $this->actingAs($sales)->get(route('admin.dashboard'))->assertSee('pengajuan belum ditanggapi');
         $this->actingAs(User::factory()->customerService()->create())->get(route('admin.dashboard'))->assertDontSee('pengajuan belum ditanggapi');
     }
 }

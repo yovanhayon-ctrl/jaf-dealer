@@ -27,7 +27,7 @@ class ServiceReportingTest extends TestCase
         parent::setUp();
 
         $this->travelTo(Carbon::parse('2026-09-20 10:00:00', 'Asia/Jakarta'));
-        $this->admin = User::factory()->owner()->create();
+        $this->admin = User::factory()->admin()->create();
         $this->customer = User::factory()->create(['name' => 'Budi Santoso']);
     }
 
@@ -173,5 +173,44 @@ class ServiceReportingTest extends TestCase
         }
 
         $this->assertSame($before, $count());
+    }
+
+    public function test_pendapatan_servis_menggabungkan_jasa_dan_suku_cadang(): void
+    {
+        $service = Service::factory()->create(['price_from' => 300_000]);
+        $booking = $this->booking($service, 'completed', '2026-09-10', [
+            'service_price' => 350_000,
+        ]);
+
+        $sparePart = \App\Models\SparePart::factory()->create([
+            'name' => 'Oli Mesin 4L',
+            'part_number' => 'OIL-001',
+            'stock' => 15,
+            'price' => 450_000,
+        ]);
+
+        \App\Models\ServiceBookingSparePart::factory()->create([
+            'service_booking_id' => $booking->id,
+            'spare_part_id' => $sparePart->id,
+            'part_name' => $sparePart->name,
+            'part_number' => $sparePart->part_number,
+            'quantity' => 1,
+            'price' => 450_000,
+            'subtotal' => 450_000,
+        ]);
+
+        $owner = User::factory()->owner()->create();
+
+        $report = new \App\Reports\AdminReport(\App\Reports\ReportPeriod::preset('bulan-ini'));
+
+        $this->assertSame(350_000, $report->serviceLaborRevenue());
+        $this->assertSame(450_000, $report->serviceSparePartsRevenue());
+        $this->assertSame(800_000, $report->serviceRevenue());
+
+        $this->actingAs($owner)->get(route('admin.reports.index'))
+            ->assertOk()
+            ->assertSee('Rp 800.000')
+            ->assertSee('Suku Cadang Terpopuler di Bengkel')
+            ->assertSee('Oli Mesin 4L');
     }
 }

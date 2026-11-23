@@ -87,6 +87,10 @@ class ServiceDataTest extends TestCase
     public function test_normalisasi_plat_dan_kapasitas_slot(): void
     {
         $this->assertSame('B 1234 ABC', ServiceBooking::normalizePlate("  b  1234\tabc "));
+        $this->assertSame('B 1245 HAZ', ServiceBooking::normalizePlate('b1245haz'));
+        $this->assertSame('D 1234 ABC', ServiceBooking::normalizePlate('d1234abc'));
+        $this->assertSame('AB 2235 WEZ', ServiceBooking::normalizePlate('ab2235wez'));
+        $this->assertSame('B 1', ServiceBooking::normalizePlate('b1'));
 
         $this->assertSame(3, ServiceBooking::slotCapacity());
         config(['dealer.service_slot_capacity' => 0]);

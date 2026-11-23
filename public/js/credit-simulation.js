@@ -56,6 +56,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var maxPrice = BigInt(form.getAttribute('data-max-price'));
 
     var carSelect = form.querySelector('[data-credit-car]');
+    var colorGroup = form.querySelector('[data-credit-color-group]');
+    var colorSelect = form.querySelector('[data-credit-color]');
     var priceGroup = form.querySelector('[data-credit-price-group]');
     var priceInput = form.querySelector('[data-credit-price]');
     var dpInput = form.querySelector('[data-credit-dp]');
@@ -83,8 +85,67 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     var selectedPrice = function () {
+        if (carSelect.value === '') {
+            return digits(priceInput);
+        }
+        if (colorGroup && !colorGroup.classList.contains('d-none') && colorSelect && colorSelect.options.length > 0) {
+            var colOpt = colorSelect.options[colorSelect.selectedIndex];
+            if (colOpt && colOpt.getAttribute('data-price')) {
+                return BigInt(colOpt.getAttribute('data-price'));
+            }
+        }
         var option = carSelect.options[carSelect.selectedIndex];
-        return carSelect.value !== '' && option ? BigInt(option.getAttribute('data-price')) : digits(priceInput);
+        return option && option.getAttribute('data-price') ? BigInt(option.getAttribute('data-price')) : digits(priceInput);
+    };
+
+    var getCarColorsMap = function () {
+        try {
+            var raw = carSelect.getAttribute('data-car-colors');
+            return raw ? JSON.parse(raw) : {};
+        } catch (e) {
+            return {};
+        }
+    };
+
+    var syncColorOptions = function (preferredColor) {
+        if (!colorGroup || !colorSelect) return;
+        var slug = carSelect.value;
+        if (!slug) {
+            colorGroup.classList.add('d-none');
+            colorSelect.innerHTML = '';
+            return;
+        }
+
+        var map = getCarColorsMap();
+        var carData = map[slug];
+        if (!carData || !carData.colors || carData.colors.length === 0) {
+            colorGroup.classList.add('d-none');
+            colorSelect.innerHTML = '';
+            return;
+        }
+
+        var colors = carData.colors;
+        var primaryColor = carData.primary || '';
+        var colorToSelect = preferredColor || primaryColor || (colors[0] ? colors[0].name : '');
+
+        colorSelect.innerHTML = '';
+        colors.forEach(function (c) {
+            var opt = document.createElement('option');
+            opt.value = c.name;
+            opt.setAttribute('data-price', c.price);
+            opt.setAttribute('data-extra-price', c.extra_price);
+            opt.textContent = c.name + ' · ' + rupiah(c.price);
+            if (c.name === colorToSelect) {
+                opt.selected = true;
+            }
+            colorSelect.appendChild(opt);
+        });
+
+        if (colorSelect.selectedIndex < 0 && colorSelect.options.length > 0) {
+            colorSelect.options[0].selected = true;
+        }
+
+        colorGroup.classList.remove('d-none');
     };
 
     var minDownPayment = credit.minDownPayment;
@@ -137,12 +198,17 @@ document.addEventListener('DOMContentLoaded', function () {
             row.classList.toggle('fw-semibold', months === tenor);
         });
 
-        // Tombol "Ajukan dengan simulasi ini" membawa DP & tenor terbaru.
+        // Tombol "Ajukan dengan simulasi ini" membawa DP, tenor, & warna terbaru.
         if (applyLink) {
-            var url = new URL(applyLink.href);
+            var url = new URL(applyLink.href, window.location.origin);
             url.searchParams.set('dp', downPayment.toString());
             url.searchParams.set('tenor', String(tenor));
-            applyLink.href = url.toString();
+            if (colorSelect && colorSelect.value && colorGroup && !colorGroup.classList.contains('d-none')) {
+                url.searchParams.set('warna', colorSelect.value);
+            } else {
+                url.searchParams.delete('warna');
+            }
+            applyLink.href = url.pathname + url.search;
         }
 
         showResult(true);
@@ -173,8 +239,17 @@ document.addEventListener('DOMContentLoaded', function () {
     // DP dikosongkan saat mobil diganti agar kembali ke DP minimal mobil baru.
     carSelect.addEventListener('change', function () {
         dpInput.value = '';
+        syncColorOptions();
         render();
     });
+
+    if (colorSelect) {
+        colorSelect.addEventListener('change', function () {
+            dpInput.value = '';
+            render();
+        });
+    }
+
     [priceInput, dpInput].forEach(function (input) { input.addEventListener('input', render); });
     tenorSelect.addEventListener('change', render);
 });

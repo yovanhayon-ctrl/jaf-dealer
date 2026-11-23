@@ -56,6 +56,7 @@ class TestDriveBookingTest extends TestCase
             'preferred_time' => '10:00',
             'phone' => '081234567890',
             'notes' => 'Ingin mencoba di jalan tol.',
+            'has_sim' => '1',
             ...$overrides,
         ];
     }
@@ -323,10 +324,19 @@ class TestDriveBookingTest extends TestCase
         ]);
 
         $this->book()
-            ->assertSessionHasErrors(['preferred_time' => 'Jadwal ini sudah dipesan, silakan pilih jam atau tanggal lain.'])
+            ->assertSessionHasErrors(['preferred_time' => 'Maaf, unit mobil ini sudah terjadwal untuk Test Drive pada tanggal dan jam tersebut. Silakan pilih jam atau tanggal lain.'])
             ->assertSessionHasInput('notes', 'Ingin mencoba di jalan tol.');
 
         $this->assertSame(1, TestDrive::count());
+    }
+
+    public function test_booking_gagal_jika_pernyataan_sim_tidak_disetujui(): void
+    {
+        $this->book(['has_sim' => '0'])
+            ->assertRedirect(route('test-drives.create'))
+            ->assertSessionHasErrors(['has_sim' => 'Anda wajib menyetujui pernyataan kepemilikan SIM A aktif untuk melakukan booking test drive.']);
+
+        $this->assertSame(0, TestDrive::count());
     }
 
     public function test_slot_lain_mobil_lain_atau_slot_dibatalkan_boleh(): void

@@ -132,7 +132,8 @@ class BackupTest extends TestCase
             ->assertSee('Cadangan terakhir 20 Okt 2026 02:00')
             ->assertSee('dashboard-backup-warning', false);
 
-        $this->actingAs(User::factory()->superAdmin()->create())->get(route('admin.dashboard'))->assertSee('Cadangan terakhir');
+        // Tombol dan status cadangan hanya untuk Owner.
+        $this->actingAs(User::factory()->superAdmin()->create())->get(route('admin.dashboard'))->assertDontSee('Cadangan terakhir');
         $this->actingAs(User::factory()->admin()->create())->get(route('admin.dashboard'))->assertDontSee('Cadangan terakhir');
     }
 

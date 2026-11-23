@@ -258,4 +258,165 @@ class ServiceBookingManagementTest extends TestCase
         $this->assertSame('confirmed', $booking->status);
         $this->assertSame('Mohon datang tepat waktu.', $booking->admin_note);
     }
+
+    public function test_catatan_otomatis_dipasang_bila_admin_mengosongkan(): void
+    {
+        $booking = $this->makeBooking(['status' => 'pending']);
+
+        $this->changeStatus($booking, ['status' => 'confirmed', 'admin_note' => ''])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('confirmed', $booking->fresh()->status);
+        $this->assertSame(ServiceBooking::NOTE_TEMPLATES['confirmed'], $booking->fresh()->admin_note);
+    }
+
+    public function test_catatan_otomatis_dengan_tanda_alasan_wajib_dilengkapi(): void
+    {
+        $booking = $this->makeBooking(['status' => 'pending']);
+
+        $this->changeStatus($booking, ['status' => 'cancelled', 'admin_note' => ServiceBooking::NOTE_TEMPLATES['cancelled']])
+            ->assertSessionHasErrors(['admin_note' => 'Lengkapi catatan admin: ganti tanda … dengan alasan untuk customer.']);
+        $this->assertSame('pending', $booking->fresh()->status);
+
+        $this->changeStatus($booking, ['status' => 'cancelled', 'admin_note' => 'Mohon maaf, booking servis dibatalkan karena kuota teknisi penuh.'])
+            ->assertSessionHasNoErrors();
+        $this->assertSame('cancelled', $booking->fresh()->status);
+    }
+
+    public function test_form_status_membawa_catatan_otomatis(): void
+    {
+        $booking = $this->makeBooking(['status' => 'pending']);
+
+        $this->actingAs($this->admin)->get(route('admin.service-bookings.show', $booking))
+            ->assertSee('data-note-templates=\''.json_encode($booking->noteTemplates()).'\'', false);
+    }
+
+    public function test_admin_bisa_mencentang_dan_melewati_pekerjaan_checklist(): void
+    {
+        $mechanic = User::factory()->mechanic()->create(['name' => 'Bambang']);
+        $booking = $this->makeBooking(['status' => 'confirmed', 'mechanic_id' => $mechanic->id]);
+        $task = $booking->tasks()->create(['name' => 'Cek Oli Mesin', 'position' => 1]);
+
+        // Ditolak saat masih berstatus confirmed
+        $this->actingAs($this->admin)
+            ->patch(route('admin.service-bookings.tasks.update', [$booking, $task]), ['status' => 'done'])
+            ->assertSessionHas('error', 'Checklist pekerjaan baru dapat dicentang saat servis sedang dikerjakan.');
+
+        // Saat status in_progress, checklist baru bisa dicentang
+        $booking->update(['status' => 'in_progress']);
+
+        // Tandai selesai
+        $this->actingAs($this->admin)
+            ->patch(route('admin.service-bookings.tasks.update', [$booking, $task]), ['status' => 'done'])
+            ->assertRedirect(route('admin.service-bookings.show', $booking).'#pekerjaan')
+            ->assertSessionHas('success');
+
+        $this->assertTrue($task->fresh()->isDone());
+        $this->assertNotNull($task->fresh()->checked_at);
+
+        // Lewati pekerjaan dengan catatan
+        $this->actingAs($this->admin)
+            ->patch(route('admin.service-bookings.tasks.update', [$booking, $task]), [
+                'status' => 'skipped',
+                'note' => 'Filter oli masih baru',
+            ])
+            ->assertSessionHas('success');
+
+        $this->assertTrue($task->fresh()->isSkipped());
+        $this->assertSame('Filter oli masih baru', $task->fresh()->note);
+
+        // Batalkan centang kembali ke pending
+        $this->actingAs($this->admin)
+            ->patch(route('admin.service-bookings.tasks.update', [$booking, $task]), ['status' => 'pending'])
+            ->assertSessionHas('success');
+
+        $this->assertTrue($task->fresh()->isPending());
+    }
+
+    public function test_admin_bisa_mengisi_dan_mengubah_temuan_dan_rekomendasi(): void
+    {
+        $mechanic = User::factory()->mechanic()->create();
+        $booking = $this->makeBooking(['status' => 'in_progress', 'mechanic_id' => $mechanic->id]);
+
+        $this->actingAs($this->admin)
+            ->patch(route('admin.service-bookings.findings', $booking), [
+                'findings' => 'Kampas rem depan menipis, disarankan ganti dalam 1.000 km.',
+            ])
+            ->assertRedirect(route('admin.service-bookings.show', $booking).'#pekerjaan')
+            ->assertSessionHas('success', 'Temuan & rekomendasi disimpan.');
+
+        $this->assertSame('Kampas rem depan menipis, disarankan ganti dalam 1.000 km.', $booking->fresh()->findings);
+    }
+
+    public function test_detail_menampilkan_tombol_whatsapp_dengan_pesan_otomatis(): void
+    {
+        $booking = $this->makeBooking(['phone' => '081234567890']);
+
+        $response = $this->actingAs($this->admin)->get(route('admin.service-bookings.show', $booking))
+            ->assertOk();
+
+        $expectedUrl = $booking->whatsappContactUrl($this->admin);
+        $this->assertNotNull($expectedUrl);
+        $response->assertSee(e($expectedUrl), false);
+    }
+
+    public function test_dropdown_mekanik_menampilkan_status_real_time_dan_anti_bentrok(): void
+    {
+        $mechanicFree = User::factory()->mechanic()->create(['name' => 'Mekanik Luang']);
+        $mechanicWorking = User::factory()->mechanic()->create(['name' => 'Mekanik Sibuk']);
+        $mechanicConflict = User::factory()->mechanic()->create(['name' => 'Mekanik Bentrok']);
+
+        // Booking yang sedang dibuka admin: 2026-10-10 pukul 09:00
+        $currentBooking = $this->makeBooking([
+            'status' => 'pending',
+            'preferred_date' => '2026-10-10',
+            'preferred_time' => '09:00',
+        ]);
+
+        // Mekanik Sibuk: sedang mengerjakan servis lain (status in_progress) pada tanggal/jam lain
+        $this->makeBooking([
+            'status' => 'in_progress',
+            'mechanic_id' => $mechanicWorking->id,
+            'plate_number' => 'D 9999 WRK',
+            'preferred_date' => '2026-10-09',
+            'preferred_time' => '14:00',
+        ]);
+
+        // Mekanik Bentrok: memiliki booking aktif pada tanggal & jam yang sama persis (2026-10-10 09:00)
+        $this->makeBooking([
+            'status' => 'confirmed',
+            'mechanic_id' => $mechanicConflict->id,
+            'plate_number' => 'B 1111 CNF',
+            'preferred_date' => '2026-10-10',
+            'preferred_time' => '09:00',
+        ]);
+
+        $response = $this->actingAs($this->admin)->get(route('admin.service-bookings.show', $currentBooking));
+
+        $response->assertOk()
+            ->assertSee('Mekanik Luang (Tersedia)')
+            ->assertSee('Mekanik Sibuk (Sedang mengerjakan: D 9999 WRK)')
+            ->assertSee('Mekanik Bentrok (Bentrok jadwal jam ini)')
+            ->assertSee('<option value="'.$mechanicConflict->id.'"  disabled>Mekanik Bentrok (Bentrok jadwal jam ini)</option>', false);
+
+        // Admin dilarang menugaskan mekanik yang bentrok jadwal pada jam yang sama
+        $this->actingAs($this->admin)
+            ->from(route('admin.service-bookings.show', $currentBooking))
+            ->patch(route('admin.service-bookings.assign-mechanic', $currentBooking), [
+                'mechanic_id' => $mechanicConflict->id,
+            ])
+            ->assertRedirect(route('admin.service-bookings.show', $currentBooking).'#pekerjaan')
+            ->assertSessionHasErrorsIn('mechanic', 'mechanic_id');
+
+        // Admin diizinkan menugaskan mekanik yang sedang mengerjakan servis lain jika jadwalnya berbeda
+        $this->actingAs($this->admin)
+            ->from(route('admin.service-bookings.show', $currentBooking))
+            ->patch(route('admin.service-bookings.assign-mechanic', $currentBooking), [
+                'mechanic_id' => $mechanicWorking->id,
+            ])
+            ->assertRedirect(route('admin.service-bookings.show', $currentBooking).'#pekerjaan')
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame($mechanicWorking->id, $currentBooking->fresh()->mechanic_id);
+    }
 }

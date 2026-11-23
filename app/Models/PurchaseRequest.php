@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 #[Fillable([
-    'user_id', 'car_id', 'car_price', 'payment_method', 'down_payment', 'tenor_months',
+    'user_id', 'car_id', 'color', 'sales_id', 'car_price', 'payment_method', 'down_payment', 'tenor_months',
     'interest_rate', 'monthly_installment', 'phone', 'address', 'notes', 'status',
     'admin_note',
 ])]
@@ -164,6 +164,16 @@ class PurchaseRequest extends Model
     public function car(): BelongsTo
     {
         return $this->belongsTo(Car::class);
+    }
+
+    public function sales(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'sales_id');
+    }
+
+    public function isAssignedTo(?User $user): bool
+    {
+        return $user !== null && $this->sales_id === $user->id;
     }
 
     public function testimonial(): HasOne
@@ -392,6 +402,26 @@ class PurchaseRequest extends Model
      * Lewat batas pembayaran pertama tanpa bukti yang sedang diverifikasi. Aturannya sama dengan scope paymentOverdue().
      */
     /**
+     * Pesan WhatsApp (wa.me) untuk admin/sales menghubungi customer pengajuan secara manual.
+     */
+    public function whatsappContactUrl(?User $staff = null): ?string
+    {
+        $number = preg_replace('/^0/', '62', preg_replace('/\D/', '', (string) $this->phone));
+
+        if ($number === '') {
+            return null;
+        }
+
+        $this->loadMissing(['user', 'car.brand']);
+        $dealerName = (string) config('dealer.name', 'JAF Dealer');
+        $sender = $staff?->name ? "saya {$staff->name} dari {$dealerName}" : "kami dari {$dealerName}";
+        $carLabel = trim("{$this->car->brand->name} {$this->car->name} {$this->car->year}");
+        $text = "Halo {$this->user->name}, {$sender}. Menghubungi Anda terkait pengajuan pembelian mobil {$carLabel} dengan No. Pengajuan {$this->documentNumber()} (Pembayaran: {$this->paymentMethodLabel()}). Apakah ada informasi atau berkas yang perlu kami bantu untuk proses pengajuan Anda? Terima kasih.";
+
+        return "https://wa.me/{$number}?text=".rawurlencode($text);
+    }
+
+    /**
      * Pesan WhatsApp (wa.me) untuk mengingatkan batas pembayaran pertama secara manual; null bila nomor kosong.
      */
     public function whatsappPaymentReminderUrl(): ?string
@@ -577,5 +607,13 @@ class PurchaseRequest extends Model
     public function interestTotal(): int
     {
         return $this->isCredit() ? $this->totalPayment() - $this->car_price : 0;
+    }
+
+    /**
+     * Dapatkan gambar mobil yang sesuai dengan varian warna yang diajukan.
+     */
+    public function carImage(): ?CarImage
+    {
+        return $this->car?->imageForColor($this->color);
     }
 }

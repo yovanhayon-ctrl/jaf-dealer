@@ -52,6 +52,7 @@ class PurchaseRequestRequest extends FormRequest
             'phone' => $this->normalizePhone($this->input('phone')),
             'address' => $trim('address'),
             'notes' => $trim('notes'),
+            'color' => $trim('color'),
         ]);
     }
 
@@ -67,6 +68,7 @@ class PurchaseRequestRequest extends FormRequest
             'phone' => ['required', 'regex:'.self::PHONE_REGEX],
             'address' => ['required', 'string', 'min:10', 'max:'.self::MAX_ADDRESS_LENGTH],
             'notes' => ['nullable', 'string', 'max:'.self::MAX_NOTES_LENGTH],
+            'color' => ['nullable', 'string', 'max:100'],
         ];
     }
 
@@ -86,7 +88,7 @@ class PurchaseRequestRequest extends FormRequest
                 $conflicts = app(SubmitPurchaseRequest::class)->conflicts(
                     $this->user(),
                     $this->car()->loadMissing('activePromos'),
-                    $this->only(['payment_method', 'down_payment']),
+                    $this->only(['payment_method', 'down_payment', 'color']),
                 );
 
                 foreach ($conflicts as $field => $message) {
@@ -110,6 +112,7 @@ class PurchaseRequestRequest extends FormRequest
             'phone' => $data['phone'],
             'address' => $data['address'],
             'notes' => ($data['notes'] ?? null) ?: null,
+            'color' => ($data['color'] ?? null) ?: null,
         ];
     }
 

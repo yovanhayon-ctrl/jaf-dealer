@@ -22,7 +22,7 @@ class StaffController extends Controller
     {
         $staff = User::query()
             ->whereIn('role', User::STAFF_ROLES)
-            ->orderByRaw("CASE role WHEN 'owner' THEN 0 WHEN 'super_admin' THEN 1 WHEN 'admin' THEN 2 WHEN 'sales' THEN 3 WHEN 'customer_service' THEN 4 ELSE 5 END")
+            ->orderByRaw("CASE role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 WHEN 'sales' THEN 2 WHEN 'customer_service' THEN 3 ELSE 4 END")
             ->orderByDesc('is_active')
             ->orderBy('name')
             ->withAvg('mechanicRatings', 'rating')
@@ -91,6 +91,28 @@ class StaffController extends Controller
 
         return redirect()->route('admin.staff.index')
             ->with('success', "Akun {$user->name} diperbarui".($user->is_active ? '.' : ' dan dinonaktifkan (tidak bisa login).'));
+    }
+
+    public function destroy(Request $request, User $user): RedirectResponse
+    {
+        $this->ensureEditable($request, $user);
+
+        $name = $user->name;
+        $roleLabel = $user->roleLabel();
+        $role = $user->role;
+
+        $user->delete();
+
+        ActivityLog::record(
+            ActivityLog::CATEGORY_ACCOUNT,
+            'staff.deleted',
+            "Menghapus akun staf {$name} ({$roleLabel})",
+            null,
+            ['name' => $name, 'role' => $role]
+        );
+
+        return redirect()->route('admin.staff.index')
+            ->with('success', "Akun staf {$name} ({$roleLabel}) berhasil dihapus.");
     }
 
     /**

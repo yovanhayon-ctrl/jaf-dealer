@@ -127,6 +127,12 @@ main {
 
 /* ---------- Form ---------- */
 
+/* Input Plat Nomor: visual uppercase otomatis tanpa mengganggu kursor */
+input[data-plate-number],
+input[name="plate_number"] {
+    text-transform: uppercase;
+}
+
 .form-control:focus,
 .form-select:focus,
 .form-check-input:focus {
@@ -581,6 +587,62 @@ main {
     display: none;
 }
 
+/* Mode Showcase Mobil 360: Full-Bleed dari tengah ke tepi kanan */
+.home-hero.hero-mode-showcase {
+    position: relative;
+    overflow: hidden;
+    background: #0e0f11 !important;
+}
+
+/* Sembunyikan ornamen garis diagonal merah & layer bawaan agar tidak bertabrakan */
+.home-hero.hero-mode-showcase::before,
+.home-hero.hero-mode-showcase::after {
+    display: none !important;
+}
+
+.home-hero.hero-mode-showcase .home-hero-inner {
+    position: relative;
+    z-index: 2;
+    min-height: min(85svh, 780px);
+}
+
+.home-hero.hero-mode-showcase .home-hero-inner .row {
+    align-items: center;
+}
+
+@media (min-width: 992px) {
+    .hero-mode-showcase .hero-showcase-stage {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 68%;
+        height: 100%;
+        z-index: 1;
+        pointer-events: none;
+        overflow: hidden;
+    }
+
+    .hero-mode-showcase .hero-showcase-video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center;
+        border-radius: 0;
+        border: none;
+        box-shadow: none;
+        -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.4) 10%, black 28%);
+        mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.4) 10%, black 28%);
+    }
+
+    /* Pudar halus dari #0e0f11 di 0% menuju transparan penuh di ~35% agar bumper depan mobil tetap cerah */
+    .hero-mode-showcase .hero-showcase-fade {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(90deg, #0e0f11 0%, rgba(14, 15, 17, 0.92) 12%, rgba(14, 15, 17, 0.4) 24%, rgba(14, 15, 17, 0) 35%);
+    }
+}
+
 @media (max-width: 991.98px) {
     .hero-video {
         display: none;
@@ -609,6 +671,42 @@ main {
     .home-hero::before {
         inset: 0 -75% 0 72%;
         opacity: .6;
+    }
+
+    /* HP: saat showcase aktif, tampilkan di bawah home-hero-inner secara normal flow */
+    .home-hero.hero-mode-showcase {
+        background: #0e0f11 !important;
+    }
+
+    .hero-mode-showcase .home-hero-inner {
+        min-height: auto;
+        padding-top: 4rem;
+        padding-bottom: 1.5rem;
+    }
+
+    .hero-mode-showcase .hero-showcase-stage {
+        position: relative;
+        width: calc(100% - 2rem);
+        max-width: 540px;
+        margin: 0 auto 2.5rem;
+        aspect-ratio: 16 / 9;
+        border-radius: var(--dm-radius-panel);
+        overflow: hidden;
+        background: #0e0f11;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+        z-index: 2;
+    }
+
+    .hero-mode-showcase .hero-showcase-video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center;
+        border-radius: var(--dm-radius-panel);
+    }
+
+    .hero-mode-showcase .hero-showcase-fade {
+        display: none;
     }
 }
 
@@ -728,6 +826,203 @@ main {
     justify-content: center;
     color: #adb5bd;
     font-size: 2.5rem;
+}
+
+/* Media kartu suku cadang (persegi produk 1:1, latar bersih agar foto katalog menyatu elegan) */
+.spare-part-card-media {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background-color: #ffffff;
+    padding: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-top-left-radius: inherit;
+    border-top-right-radius: inherit;
+    overflow: hidden;
+    border-bottom: 1px solid var(--dm-border);
+}
+
+.spare-part-card-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    transition: transform 0.25s ease;
+}
+
+.card:hover .spare-part-card-img {
+    transform: scale(1.04);
+}
+
+.spare-part-card-img-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    color: #adb5bd;
+    font-size: 3rem;
+    background-color: #ffffff;
+}
+
+.spare-part-badge-category {
+    background: rgba(15, 23, 42, 0.85);
+    color: #ffffff;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: 0.01em;
+}
+
+/* Badge halus elegan mode gelap & terang */
+.badge-subtle-soft {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: #e2e8f0;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+[data-bs-theme="light"] .badge-subtle-soft {
+    background: rgba(15, 23, 42, 0.06);
+    border: 1px solid rgba(15, 23, 42, 0.14);
+    color: #1e293b;
+}
+
+.badge-subtle-soft.is-success {
+    color: #34d399;
+    border-color: rgba(52, 211, 153, 0.25);
+    background: rgba(52, 211, 153, 0.08);
+}
+
+[data-bs-theme="light"] .badge-subtle-soft.is-success {
+    color: #059669;
+    border-color: rgba(5, 150, 105, 0.25);
+    background: rgba(5, 150, 105, 0.08);
+}
+
+/* Panggung showcase foto produk di halaman detail spare part */
+.spare-part-detail-stage {
+    background-color: #ffffff;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    margin: 0 auto;
+    overflow: hidden;
+    border: 1px solid var(--dm-border, rgba(0, 0, 0, 0.08));
+}
+
+.spare-part-detail-stage img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.spare-part-detail-stage-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    color: #adb5bd;
+    background-color: #ffffff;
+    border-radius: 14px;
+    font-size: 3.5rem;
+}
+
+/* Quantity picker input di detail spare part */
+.quantity-picker {
+    width: fit-content;
+    display: inline-flex;
+    align-items: center;
+}
+
+.quantity-picker .btn {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--dm-border);
+    background-color: var(--dm-card-bg);
+    color: var(--dm-text);
+}
+
+.quantity-picker .btn:hover:not(:disabled) {
+    background-color: var(--dm-tint);
+    color: var(--dm-text);
+}
+
+.quantity-picker input#partQtyInput {
+    width: 52px;
+    height: 36px;
+    padding: 0;
+    text-align: center;
+    font-weight: 700;
+    font-size: 1rem;
+    line-height: 36px;
+    border-top: 1px solid var(--dm-border);
+    border-bottom: 1px solid var(--dm-border);
+    border-left: none;
+    border-right: none;
+    background-color: var(--dm-card-bg);
+    color: var(--dm-text);
+    -webkit-appearance: none;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.quantity-picker input#partQtyInput::-webkit-inner-spin-button,
+.quantity-picker input#partQtyInput::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* Rangkuman spesifikasi teknis spare part */
+.spare-part-spec-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.spare-part-spec-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+}
+
+.spare-part-spec-row:not(:last-child) {
+    border-bottom: 1px solid var(--dm-border, rgba(255, 255, 255, 0.08));
+}
+
+.spare-part-spec-label {
+    color: var(--dm-muted, #9ca3af);
+    font-size: 0.875rem;
+    white-space: nowrap;
+}
+
+.spare-part-spec-value {
+    text-align: right;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--dm-text);
 }
 
 /* Tombol favorit (hati) di pojok kanan atas foto kartu mobil. */
@@ -877,6 +1172,66 @@ main {
 
 .car-detail-price {
     font-size: 1.75rem;
+}
+
+/* Color Swatches pada detail mobil */
+.car-color-swatches {
+    padding: .85rem 1rem;
+    background-color: var(--dm-tint);
+    border: 1px solid var(--dm-line);
+    border-radius: var(--dm-radius-panel);
+}
+
+.color-swatch-btn {
+    position: relative;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform .15s ease;
+}
+
+.color-swatch-btn:hover {
+    transform: scale(1.12);
+}
+
+.color-swatch-btn:focus-visible {
+    outline: none;
+}
+
+.color-swatch-dot {
+    display: block;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 0, 0, .25);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .15);
+    transition: outline .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+
+[data-bs-theme="dark"] .color-swatch-dot {
+    border: 1px solid rgba(255, 255, 255, .35);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
+}
+
+.color-swatch-btn.active .color-swatch-dot {
+    outline: 2.5px solid var(--dm-red);
+    outline-offset: 3px;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, .1);
+}
+
+[data-bs-theme="dark"] .color-swatch-btn.active .color-swatch-dot {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, .2);
+}
+
+.color-swatch-btn.is-out-of-stock .color-swatch-dot {
+    opacity: 0.28;
 }
 
 .promo-box {
@@ -1042,6 +1397,22 @@ img.promo-card-img {
 
 .notification-bell .bi {
     margin-right: 0;
+    display: inline-block;
+    transition: transform .2s ease;
+}
+
+.notification-bell.bell-ringing .bi {
+    animation: bell-ring .8s ease-in-out;
+}
+
+@keyframes bell-ring {
+    0% { transform: rotate(0); }
+    15% { transform: rotate(15deg); }
+    30% { transform: rotate(-15deg); }
+    45% { transform: rotate(10deg); }
+    60% { transform: rotate(-10deg); }
+    75% { transform: rotate(5deg); }
+    100% { transform: rotate(0); }
 }
 
 .notification-bell .badge {
@@ -1383,17 +1754,23 @@ img.promo-card-img {
 
 .stat-card {
     color: inherit;
+    min-height: 86px;
+    overflow: hidden;
+}
+
+.stat-card .card-body {
+    padding: 0.75rem 0.85rem;
 }
 
 .stat-card-icon {
-    flex: 0 0 48px;
-    width: 48px;
-    height: 48px;
+    flex: 0 0 42px;
+    width: 42px;
+    height: 42px;
     border-radius: var(--dm-radius-control);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.35rem;
+    font-size: 1.25rem;
 }
 
 .stat-card-icon-navy   { background-color: rgba(28, 28, 30, .1);   color: var(--dm-ink); }
@@ -1404,10 +1781,33 @@ img.promo-card-img {
 .stat-card-icon-dark   { background-color: rgba(52, 58, 64, .12);  color: #343a40; }
 
 .stat-card-value {
-    font-size: 1.6rem;
+    font-size: 1.45rem;
     font-weight: 700;
-    line-height: 1.1;
+    line-height: 1.2;
     color: var(--dm-ink);
+    white-space: nowrap;
+}
+
+.stat-card-value-sm {
+    font-size: 1.05rem;
+    letter-spacing: -0.01em;
+}
+
+.stat-card-value-xs {
+    font-size: 0.92rem;
+    letter-spacing: -0.02em;
+}
+
+@media (max-width: 1400px) {
+    .stat-card-value {
+        font-size: 1.3rem;
+    }
+    .stat-card-value-sm {
+        font-size: 0.95rem;
+    }
+    .stat-card-value-xs {
+        font-size: 0.84rem;
+    }
 }
 
 /* ---------- Komponen: status-badge (RANCANGAN §2) ---------- */
@@ -1477,6 +1877,25 @@ img.promo-card-img {
 .dashboard-chart {
     position: relative;
     height: 280px;
+}
+
+.trend-toggle-btn {
+    font-size: 0.8125rem;
+    color: var(--dm-muted);
+}
+
+.trend-toggle-btn:hover,
+.trend-toggle-btn:focus-visible {
+    color: var(--dm-text);
+}
+
+.trend-toggle-icon {
+    display: inline-block;
+    transition: transform 0.25s ease;
+}
+
+.trend-toggle-btn[aria-expanded="true"] .trend-toggle-icon {
+    transform: rotate(90deg);
 }
 
 /* ---------- Ulasan customer ---------- */
@@ -1566,7 +1985,8 @@ img.promo-card-img {
 }
 
 .stat-card-label {
-    line-height: 1.3;
+    font-size: 0.8rem;
+    line-height: 1.25;
 }
 
 .stat-card-alert {

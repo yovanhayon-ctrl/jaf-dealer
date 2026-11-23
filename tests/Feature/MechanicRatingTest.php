@@ -126,19 +126,22 @@ class MechanicRatingTest extends TestCase
         $this->actingAs($this->customer)->get(route('mechanic.ratings.index'))->assertForbidden();
     }
 
-    public function test_owner_dan_admin_melihat_kinerja_mekanik(): void
+    public function test_admin_melihat_kinerja_mekanik(): void
     {
         MechanicRating::factory()->for($this->booking, 'booking')->create(['mechanic_id' => $this->mechanic->id, 'user_id' => $this->customer->id, 'rating' => 5]);
         MechanicRating::factory()->create(['mechanic_id' => $this->mechanic->id, 'rating' => 4]);
 
-        $this->actingAs(User::factory()->owner()->create())->get(route('admin.staff.index'))
+        $this->actingAs(User::factory()->admin()->create())->get(route('admin.staff.index'))
             ->assertSee('4,5')
             ->assertSee('(2 rating)')
             ->assertSee('2 servis selesai');
 
-        $this->actingAs(User::factory()->admin()->create())->get(route('admin.service-bookings.show', $this->booking))
+        $this->get(route('admin.service-bookings.show', $this->booking))
             ->assertSee('Rating customer untuk mekanik:')
             ->assertSee('Rating 5 dari 5');
+
+        // Owner tidak mengakses menu staf (403)
+        $this->actingAs(User::factory()->owner()->create())->get(route('admin.staff.index'))->assertForbidden();
     }
 
     public function test_rating_tidak_tampil_di_halaman_publik(): void

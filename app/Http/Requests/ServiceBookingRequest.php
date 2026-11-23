@@ -10,6 +10,7 @@ use App\Models\Service;
 use App\Models\ServiceBooking;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -70,7 +71,7 @@ class ServiceBookingRequest extends FormRequest
             'plate_number' => ['required', 'string', 'max:15', 'regex:'.ServiceBooking::PLATE_REGEX],
             'vehicle_year' => ['nullable', 'integer', 'min:'.self::MIN_VEHICLE_YEAR, 'max:'.(today()->year + 1)],
             'mileage' => ['nullable', 'integer', 'min:0', 'max:'.self::MAX_MILEAGE],
-            // Tanggal WIB (timezone aplikasi Asia/Jakarta): besok s/d hari ini + 30 hari.
+            // Tanggal WIB (timezone aplikasi Asia/Jakarta): hari ini (bila slot masih tersedia) atau besok s/d 30 hari ke depan.
             'preferred_date' => [
                 'required', 'date_format:Y-m-d',
                 'after_or_equal:'.self::firstDate(),
@@ -93,7 +94,24 @@ class ServiceBookingRequest extends FormRequest
     {
         return [
             function (Validator $validator) {
-                if ($validator->errors()->hasAny(['service_id', 'plate_number', 'preferred_date', 'preferred_time', 'mechanic_id'])) {
+                if ($validator->errors()->hasAny(['preferred_date', 'preferred_time'])) {
+                    return;
+                }
+
+                $date = $this->string('preferred_date')->value();
+                $time = $this->string('preferred_time')->value();
+                $validSlots = ServiceBooking::availableTimeSlots($date);
+
+                if (! in_array($time, $validSlots, true)) {
+                    $validator->errors()->add(
+                        'preferred_time',
+                        'Jam servis yang dipilih sudah lewat atau terlalu mepet (minimal jeda 1 jam dari sekarang). Silakan pilih jam lain.'
+                    );
+
+                    return;
+                }
+
+                if ($validator->errors()->hasAny(['service_id', 'plate_number', 'mechanic_id'])) {
                     return;
                 }
 
@@ -101,8 +119,8 @@ class ServiceBookingRequest extends FormRequest
                     $this->user(),
                     Service::findOrFail($this->integer('service_id')),
                     $this->string('plate_number')->value(),
-                    $this->string('preferred_date')->value(),
-                    $this->string('preferred_time')->value(),
+                    $date,
+                    $time,
                     $this->filled('mechanic_id') ? $this->integer('mechanic_id') : null,
                 );
 
@@ -115,7 +133,7 @@ class ServiceBookingRequest extends FormRequest
 
     public static function firstDate(): string
     {
-        return today()->addDays(ServiceBooking::MIN_DAYS_AHEAD)->toDateString();
+        return ServiceBooking::firstAvailableDate();
     }
 
     public static function lastDate(): string
@@ -147,15 +165,20 @@ class ServiceBookingRequest extends FormRequest
      */
     public function messages(): array
     {
-        $first = today()->addDays(ServiceBooking::MIN_DAYS_AHEAD)->translatedFormat('d M Y');
+        $firstDate = self::firstDate();
+        $first = Carbon::parse($firstDate)->translatedFormat('d M Y');
         $last = today()->addDays(ServiceBooking::MAX_DAYS_AHEAD)->translatedFormat('d M Y');
         $slots = ServiceBooking::TIME_SLOTS;
+
+        $dateMinMessage = $firstDate === today()->toDateString()
+            ? "Tanggal servis tidak boleh tanggal lampau. Silakan pilih jadwal mulai hari ini ({$first})."
+            : "Pendaftaran servis untuk hari ini telah ditutup. Silakan pilih jadwal mulai besok ({$first}).";
 
         return [
             'service_id.required' => 'Pilih layanan servis.',
             'service_id.exists' => 'Layanan tidak ditemukan.',
-            'plate_number.regex' => 'Plat nomor tidak valid. Contoh: B 1234 ABC.',
-            'preferred_date.after_or_equal' => "Tanggal servis paling cepat besok ({$first}).",
+            'plate_number.regex' => 'Format plat nomor tidak valid. Gunakan standar Indonesia: 1–2 huruf, 1–4 angka, dan 1–3 huruf (contoh: D 1234 ABC atau AB 2235 WEZ).',
+            'preferred_date.after_or_equal' => $dateMinMessage,
             'preferred_date.before_or_equal' => "Tanggal servis paling lambat {$last}.",
             'preferred_time.in' => 'Pilih jam antara '.reset($slots).' dan '.end($slots).' WIB.',
             'phone.regex' => 'Nomor WhatsApp tidak valid. Gunakan format 08xx (10-13 digit).',

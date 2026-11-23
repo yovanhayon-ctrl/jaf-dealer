@@ -5,7 +5,10 @@ namespace Tests\Feature\Admin;
 use App\Models\Brand;
 use App\Models\Car;
 use App\Models\Category;
+use App\Models\MechanicRating;
 use App\Models\PurchaseRequest;
+use App\Models\Service;
+use App\Models\ServiceBooking;
 use App\Models\TestDrive;
 use App\Models\User;
 use App\Reports\AdminReport;
@@ -436,5 +439,86 @@ class ReportTest extends TestCase
         $this->assertGreaterThan(30, $sheet->getColumnDimension('A')->getWidth());
         // Nilai rupiah besar (Rp 11.430.000.000) muat di kolom C tanpa tampil "#####".
         $this->assertGreaterThanOrEqual(20, $sheet->getColumnDimension('C')->getWidth());
+    }
+
+    public function test_laporan_menampilkan_kinerja_penjualan_per_sales_dan_kinerja_mekanik(): void
+    {
+        $sales = User::factory()->sales()->create(['name' => 'Budi Sales']);
+        $mechanic = User::factory()->mechanic()->create(['name' => 'Joko Mekanik']);
+
+        $car = $this->car('Toyota', 'MPV', 'Yaris');
+        $this->purchase($car, 'completed', 300_000_000, '2026-09-10 10:00:00')->update(['sales_id' => $sales->id]);
+
+        $service = Service::factory()->create(['name' => 'Ganti Oli']);
+        $booking = ServiceBooking::factory()->recycle($this->customer)->recycle($service)->create([
+            'status' => 'completed',
+            'preferred_date' => '2026-09-12',
+            'preferred_time' => '10:00',
+            'mechanic_id' => $mechanic->id,
+        ]);
+
+        MechanicRating::factory()->create([
+            'service_booking_id' => $booking->id,
+            'mechanic_id' => $mechanic->id,
+            'user_id' => $this->customer->id,
+            'rating' => 5,
+        ]);
+
+        // Owner bisa melihat unit terjual dan nominal rupiah penjualan
+        $this->actingAs($this->admin)->get(route('admin.reports.index', ['periode' => 'bulan-ini']))
+            ->assertOk()
+            ->assertSeeInOrder(['Penjualan per Sales', 'Budi Sales', '1', 'Rp 300.000.000'])
+            ->assertSeeInOrder(['Kinerja Mekanik & Rating', 'Joko Mekanik', '1', '1', '5,0']);
+
+        // Admin biasa bisa melihat unit terjual dan mekanik, namun TIDAK melihat nominal rupiah penjualan (Opsi A)
+        $staffAdmin = User::factory()->admin()->create();
+        $this->actingAs($staffAdmin)->get(route('admin.reports.index', ['periode' => 'bulan-ini']))
+            ->assertOk()
+            ->assertSeeInOrder(['Penjualan per Sales', 'Budi Sales', '1'])
+            ->assertDontSee('Rp 300.000.000')
+            ->assertSeeInOrder(['Kinerja Mekanik & Rating', 'Joko Mekanik', '1', '1', '5,0']);
+    }
+
+    public function test_export_csv_dan_excel_memuat_bagian_sales_dan_mekanik(): void
+    {
+        $sales = User::factory()->sales()->create(['name' => 'Dewi Sales']);
+        $mechanic = User::factory()->mechanic()->create(['name' => 'Agus Mekanik']);
+
+        $car = $this->car('Honda', 'Sedan', 'Civic');
+        $this->purchase($car, 'approved', 500_000_000, '2026-09-15 11:00:00')->update(['sales_id' => $sales->id]);
+
+        $service = Service::factory()->create(['name' => 'Tune Up']);
+        $booking = ServiceBooking::factory()->recycle($this->customer)->recycle($service)->create([
+            'status' => 'completed',
+            'preferred_date' => '2026-09-18',
+            'preferred_time' => '13:00',
+            'mechanic_id' => $mechanic->id,
+        ]);
+
+        MechanicRating::factory()->create([
+            'service_booking_id' => $booking->id,
+            'mechanic_id' => $mechanic->id,
+            'user_id' => $this->customer->id,
+            'rating' => 4,
+        ]);
+
+        $rows = $this->csvRows($this->actingAs($this->admin)->get(route('admin.reports.export', ['periode' => 'bulan-ini'])));
+
+        $this->assertContains(['Sales', 'Unit', 'Nilai (Rp)'], $rows);
+        $this->assertContains(['Dewi Sales', '1', '500000000'], $rows);
+        $this->assertContains(['Mekanik', 'Servis Selesai', 'Ulasan', 'Rata-rata Rating'], $rows);
+        $this->assertContains(['Agus Mekanik', '1', '1', '4,0'], $rows);
+
+        $response = $this->actingAs($this->admin)->get(route('admin.reports.export-excel', ['periode' => 'bulan-ini']))->assertOk();
+        $file = tempnam(sys_get_temp_dir(), 'xlsx');
+        file_put_contents($file, $response->streamedContent());
+        $sheet = IOFactory::load($file)->getActiveSheet();
+        @unlink($file);
+
+        $values = array_merge(...$sheet->toArray(null, false, false));
+        $this->assertContains('Penjualan per Sales', $values);
+        $this->assertContains('Dewi Sales', $values);
+        $this->assertContains('Kinerja Mekanik', $values);
+        $this->assertContains('Agus Mekanik', $values);
     }
 }

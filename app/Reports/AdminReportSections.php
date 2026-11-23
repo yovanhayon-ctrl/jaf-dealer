@@ -43,27 +43,49 @@ class AdminReportSections
         $purchases = $this->report->purchaseSummary();
         $testDrives = $this->report->testDriveSummary();
         $services = $this->report->serviceSummary();
+        $canSeeRevenue = auth()->check() && auth()->user()->can('reports.revenue');
 
         $summary = [self::row(['Total pengajuan', $purchases['total']], total: true)];
         foreach ($purchases['statuses'] as $status => $count) {
             $summary[] = self::row(['Status '.PurchaseRequest::STATUS_LABELS[$status], $count]);
         }
-        array_push($summary,
-            self::row(['Cash', $purchases['cash']]),
-            self::row(['Kredit', $purchases['credit']]),
-            self::row(['Unit terjual', $purchases['units_sold']]),
-            self::row(['Nilai penjualan (Rp)', $purchases['sales_value']], ['text', 'rupiah']),
-        );
+        $summary[] = self::row(['Cash', $purchases['cash']]);
+        $summary[] = self::row(['Kredit', $purchases['credit']]);
+        $summary[] = self::row(['Unit terjual', $purchases['units_sold']]);
+
+        if ($canSeeRevenue) {
+            $summary[] = self::row(['Nilai penjualan (Rp)', $purchases['sales_value']], ['text', 'rupiah']);
+            $summary[] = self::row(['Pendapatan servis (Rp)', $this->report->serviceRevenue()], ['text', 'rupiah']);
+        }
 
         $sections = [self::section('Ringkasan Pengajuan', ['Keterangan', 'Jumlah'], ['text', 'number'], $summary)];
 
         foreach (['Penjualan per Merek' => ['Merek', $this->report->salesByBrand()], 'Penjualan per Kategori' => ['Kategori', $this->report->salesByCategory()]] as $title => [$column, $items]) {
-            $sections[] = self::section($title, [$column, 'Unit', 'Nilai (Rp)'], ['text', 'number', 'rupiah'],
-                $items->map(fn ($item) => self::row([$item->name, $item->units, $item->value]))->values()->all());
+            if ($canSeeRevenue) {
+                $sections[] = self::section($title, [$column, 'Unit', 'Nilai (Rp)'], ['text', 'number', 'rupiah'],
+                    $items->map(fn ($item) => self::row([$item->name, $item->units, $item->value]))->values()->all());
+            } else {
+                $sections[] = self::section($title, [$column, 'Unit'], ['text', 'number'],
+                    $items->map(fn ($item) => self::row([$item->name, $item->units]))->values()->all());
+            }
         }
 
-        $sections[] = self::section('5 Mobil Terlaris', ['Peringkat', 'Mobil', 'Unit', 'Nilai (Rp)'], ['rank', 'text', 'number', 'rupiah'],
-            $this->report->topCars()->values()->map(fn ($car, $index) => self::row([$index + 1, $car->name, $car->units, $car->value]))->all());
+        $salesByStaff = $this->report->salesByStaff();
+        if ($canSeeRevenue) {
+            $sections[] = self::section('Penjualan per Sales', ['Sales', 'Unit', 'Nilai (Rp)'], ['text', 'number', 'rupiah'],
+                $salesByStaff->map(fn ($item) => self::row([$item->name, $item->units, $item->value]))->values()->all());
+        } else {
+            $sections[] = self::section('Penjualan per Sales', ['Sales', 'Unit'], ['text', 'number'],
+                $salesByStaff->map(fn ($item) => self::row([$item->name, $item->units]))->values()->all());
+        }
+
+        if ($canSeeRevenue) {
+            $sections[] = self::section('5 Mobil Terlaris', ['Peringkat', 'Mobil', 'Unit', 'Nilai (Rp)'], ['rank', 'text', 'number', 'rupiah'],
+                $this->report->topCars()->values()->map(fn ($car, $index) => self::row([$index + 1, $car->name, $car->units, $car->value]))->all());
+        } else {
+            $sections[] = self::section('5 Mobil Terlaris', ['Peringkat', 'Mobil', 'Unit'], ['rank', 'text', 'number'],
+                $this->report->topCars()->values()->map(fn ($car, $index) => self::row([$index + 1, $car->name, $car->units]))->all());
+        }
 
         $testDriveRows = [];
         foreach ($testDrives['statuses'] as $status => $count) {
@@ -84,8 +106,28 @@ class AdminReportSections
         $sections[] = self::section('Layanan Servis Terpopuler', ['Layanan', 'Booking', 'Selesai'], ['text', 'number', 'number'],
             $this->report->servicesByPopularity()->map(fn ($service) => self::row([$service->name, $service->total, $service->completed]))->values()->all());
 
+        $sections[] = self::section('Kinerja Mekanik', ['Mekanik', 'Servis Selesai', 'Ulasan', 'Rata-rata Rating'], ['text', 'number', 'number', 'text'],
+            $this->report->mechanicPerformance()->map(fn ($m) => self::row([
+                $m->name,
+                $m->completed,
+                $m->reviews_count,
+                $m->avg_rating !== null ? number_format($m->avg_rating, 1, ',', '.') : '-',
+            ]))->values()->all());
+
+        $topParts = $this->report->topSpareParts();
+        if ($canSeeRevenue) {
+            $sections[] = self::section('Suku Cadang Terpopuler di Bengkel', ['Suku Cadang', 'Nomor SKU', 'Unit Terpakai', 'Nilai (Rp)'], ['text', 'text', 'number', 'rupiah'],
+                $topParts->map(fn ($p) => self::row([$p->part_name, $p->part_number, $p->units, $p->value]))->values()->all());
+        } else {
+            $sections[] = self::section('Suku Cadang Terpopuler di Bengkel', ['Suku Cadang', 'Nomor SKU', 'Unit Terpakai'], ['text', 'text', 'number'],
+                $topParts->map(fn ($p) => self::row([$p->part_name, $p->part_number, $p->units]))->values()->all());
+        }
+
         $sections[] = self::section('Stok Menipis (mobil aktif, stok maksimal '.Car::LOW_STOCK_THRESHOLD.')', ['Mobil', 'Kondisi', 'Stok'], ['text', 'text', 'number'],
             $this->report->lowStockCars()->map(fn ($car) => self::row(["{$car->brand->name} {$car->name} {$car->year}", $car->condition_label, $car->stock]))->values()->all());
+
+        $sections[] = self::section('Suku Cadang Stok Menipis (suku cadang aktif, stok <= batas minimum)', ['Suku Cadang', 'Nomor SKU', 'Kategori', 'Sisa Stok', 'Batas Min'], ['text', 'text', 'text', 'text', 'text'],
+            $this->report->lowStockSpareParts()->map(fn ($part) => self::row([$part->name, $part->part_number, $part->categoryLabel(), $part->stock.' '.$part->unit, $part->min_stock.' '.$part->unit]))->values()->all());
 
         return $sections;
     }

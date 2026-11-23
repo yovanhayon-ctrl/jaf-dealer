@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Models\ServiceBooking;
+use App\Models\SparePart;
 use App\Notifications\MechanicJobAssigned;
 use App\Notifications\Notifier;
 use App\Notifications\ServiceBookingStatusChanged;
@@ -40,6 +41,16 @@ class ChangeServiceBookingStatus
             $locked->fill($attributes);
 
             if ($status !== null) {
+                // Pulihkan stok suku cadang jika booking dibatalkan atau customer tidak hadir
+                if (in_array($status, [ServiceBooking::STATUS_CANCELLED, ServiceBooking::STATUS_NO_SHOW], true)
+                    && ! in_array($locked->status, [ServiceBooking::STATUS_CANCELLED, ServiceBooking::STATUS_NO_SHOW], true)) {
+                    foreach ($locked->spareParts as $item) {
+                        if ($item->spare_part_id && ($part = SparePart::find($item->spare_part_id))) {
+                            $part->increment('stock', $item->quantity);
+                        }
+                    }
+                }
+
                 $locked->status = $status;
                 $locked->started_at = $status === ServiceBooking::STATUS_IN_PROGRESS ? now() : $locked->started_at;
                 $locked->finished_at = $status === ServiceBooking::STATUS_COMPLETED ? now() : $locked->finished_at;
@@ -56,6 +67,10 @@ class ChangeServiceBookingStatus
 
             if ($status === ServiceBooking::STATUS_CONFIRMED && $updated->mechanic_id !== null) {
                 Notifier::send($updated->loadMissing('mechanic')->mechanic, new MechanicJobAssigned($updated));
+            }
+
+            if ($status === ServiceBooking::STATUS_COMPLETED && $updated->mechanic_id !== null) {
+                Notifier::send($updated->loadMissing('mechanic')->mechanic, new MechanicJobAssigned($updated, 'Pekerjaan Servis Selesai'));
             }
         }
 
