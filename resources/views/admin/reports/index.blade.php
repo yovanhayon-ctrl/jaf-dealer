@@ -18,7 +18,9 @@
     $bySales = $report->salesByStaff();
     $mechanics = $report->mechanicPerformance();
     $topCars = $report->topCars();
+    $topParts = $report->topSpareParts();
     $lowStock = $report->lowStockCars();
+    $lowStockParts = $report->lowStockSpareParts();
     $rupiah = fn (int $amount) => 'Rp '.number_format($amount, 0, ',', '.');
     $percentLabel = fn (float $value) => number_format($value, 1, ',', '.').'%';
 @endphp
@@ -444,9 +446,53 @@
         </div>
     </div>
 
+    {{-- Suku Cadang Terpopuler di Bengkel --}}
+    <div class="row g-4 mb-4">
+        <div class="col-12">
+            <div class="card h-100 report-card">
+                <div class="card-header bg-transparent border-0 pt-3 px-3 d-flex justify-content-between align-items-center">
+                    <h3 class="h6 mb-0">Suku Cadang Terpopuler di Bengkel</h3>
+                    <span class="small text-muted">Dipasang pada booking servis selesai dalam periode</span>
+                </div>
+                @if ($topParts->isEmpty())
+                    <x-empty-state icon="bi-tools" title="Belum ada suku cadang terpasang" message="Tidak ada suku cadang yang digunakan pada servis selesai di periode ini." />
+                @else
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0 admin-table">
+                            <thead>
+                                <tr>
+                                    <th class="text-center" style="width: 50px">#</th>
+                                    <th>Suku Cadang</th>
+                                    <th>Nomor SKU</th>
+                                    <th class="text-center">Unit Terpakai</th>
+                                    @can('reports.revenue')
+                                        <th class="text-end">Nilai (Rp)</th>
+                                    @endcan
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($topParts as $part)
+                                    <tr>
+                                        <td class="text-center text-muted">{{ $loop->iteration }}</td>
+                                        <td class="fw-semibold">{{ $part->part_name }}</td>
+                                        <td><code>{{ $part->part_number }}</code></td>
+                                        <td class="text-center">{{ $part->units }}</td>
+                                        @can('reports.revenue')
+                                            <td class="text-end fw-semibold text-accent">{{ $rupiah($part->value) }}</td>
+                                        @endcan
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+
     <div class="card report-card">
         <div class="card-header bg-transparent border-0 pt-3 px-3 d-flex justify-content-between align-items-center">
-            <h3 class="h6 mb-0">Stok Menipis</h3>
+            <h3 class="h6 mb-0">Stok Menipis (Mobil)</h3>
             <span class="small text-muted">Mobil aktif dengan stok ≤ {{ Car::LOW_STOCK_THRESHOLD }} (saat ini, tidak bergantung periode)</span>
         </div>
         @if ($lowStock->isEmpty())
@@ -477,6 +523,54 @@
                                 <td class="text-end d-print-none">
                                     <a href="{{ route('admin.cars.edit', $car) }}" class="btn btn-sm btn-outline-primary">
                                         <i class="bi bi-pencil-square"></i>Edit
+                                    </a>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </div>
+
+    {{-- Suku Cadang Stok Menipis --}}
+    <div class="card report-card mt-4">
+        <div class="card-header bg-transparent border-0 pt-3 px-3 d-flex justify-content-between align-items-center">
+            <h3 class="h6 mb-0">Suku Cadang Stok Menipis</h3>
+            <span class="small text-muted">Suku cadang aktif dengan stok ≤ batas minimum (saat ini, tidak bergantung periode)</span>
+        </div>
+        @if ($lowStockParts->isEmpty())
+            <x-empty-state icon="bi-check2-circle" title="Stok suku cadang aman" message="Semua suku cadang aktif memiliki stok di atas batas minimum." />
+        @else
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 admin-table">
+                    <thead>
+                        <tr>
+                            <th>Suku Cadang</th>
+                            <th>Nomor SKU</th>
+                            <th>Kategori</th>
+                            <th class="text-center">Sisa Stok</th>
+                            <th class="text-center">Batas Minimum</th>
+                            <th class="text-end d-print-none">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($lowStockParts as $part)
+                            <tr>
+                                <td class="fw-medium">{{ $part->name }}</td>
+                                <td><code>{{ $part->part_number }}</code></td>
+                                <td>{{ $part->categoryLabel() }}</td>
+                                <td class="text-center">
+                                    @if ($part->isOutOfStock())
+                                        <span class="badge bg-danger">Habis</span>
+                                    @else
+                                        <span class="badge bg-warning text-dark">{{ $part->stock }} {{ $part->unit }}</span>
+                                    @endif
+                                </td>
+                                <td class="text-center text-muted">{{ $part->min_stock }} {{ $part->unit }}</td>
+                                <td class="text-end d-print-none">
+                                    <a href="{{ route('admin.spare-parts.edit', $part) }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-pencil-square"></i>Edit Stok
                                     </a>
                                 </td>
                             </tr>

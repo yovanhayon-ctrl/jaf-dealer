@@ -60,12 +60,30 @@
 
                         <dt>Mobil</dt>
                         <dd>
-                            {{ $carLabel }}
-                            <span class="text-muted">· {{ $car->condition_label }} · stok {{ $car->stock }}</span>
-                            @unless ($car->is_active)
-                                <x-status-badge status="inactive" class="ms-1" />
-                            @endunless
+                            <div class="d-flex align-items-center gap-3">
+                                @php
+                                    $displayImage = $purchaseRequest->carImage() ?? $car->primaryImage;
+                                @endphp
+                                @if ($displayImage)
+                                    <img src="{{ $displayImage->thumb_url }}" alt="{{ $carLabel }}" class="rounded border" style="width: 64px; height: 48px; object-fit: cover;">
+                                @endif
+                                <div>
+                                    <div class="fw-medium">{{ $carLabel }}</div>
+                                    <span class="text-muted small">{{ $car->condition_label }} · total stok {{ $car->stock }} unit</span>
+                                    @unless ($car->is_active)
+                                        <x-status-badge status="inactive" class="ms-1" />
+                                    @endunless
+                                </div>
+                            </div>
                         </dd>
+
+                        @if ($purchaseRequest->color)
+                            <dt>Pilihan Warna</dt>
+                            <dd>
+                                <span class="fw-semibold">{{ $purchaseRequest->color }}</span>
+                                <span class="text-muted small">· Sisa stok warna ini: <strong>{{ $car->colorStock($purchaseRequest->color) }} unit</strong></span>
+                            </dd>
+                        @endif
 
                         <dt>Customer</dt>
                         <dd>
@@ -76,8 +94,10 @@
                         <dt>Nomor HP</dt>
                         <dd>
                             <a href="tel:{{ $purchaseRequest->phone }}">{{ $purchaseRequest->phone }}</a>
-                            <a href="https://wa.me/{{ preg_replace('/^0/', '62', preg_replace('/\D/', '', $purchaseRequest->phone)) }}" target="_blank" rel="noopener"
-                               class="btn btn-sm btn-outline-success py-0 ms-2"><i class="bi bi-whatsapp"></i>WhatsApp</a>
+                            @if ($waUrl = $purchaseRequest->whatsappContactUrl(auth()->user()))
+                                <a href="{{ $waUrl }}" target="_blank" rel="noopener"
+                                   class="btn btn-sm btn-outline-success py-0 ms-2"><i class="bi bi-whatsapp"></i>WhatsApp</a>
+                            @endif
                         </dd>
 
                         <dt>Sales Penanggung Jawab</dt>

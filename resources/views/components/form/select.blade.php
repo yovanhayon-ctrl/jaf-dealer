@@ -3,6 +3,7 @@
     'name',
     'label',
     'options' => [],
+    'disabledOptions' => [],
     'value' => null,
     'placeholder' => null,
     'required' => false,
@@ -24,7 +25,11 @@
             <option value="">{{ $placeholder }}</option>
         @endif
         @foreach ($options as $optionValue => $optionLabel)
-            <option value="{{ $optionValue }}" @selected($selected === (string) $optionValue)>{{ $optionLabel }}</option>
+            @php
+                $isSelected = $selected === (string) $optionValue;
+                $isDisabled = ! empty($disabledOptions) && in_array((string) $optionValue, array_map('strval', $disabledOptions), true);
+            @endphp
+            <option value="{{ $optionValue }}"{{ $isSelected ? ' selected' : '' }}{{ $isDisabled ? ' disabled' : '' }}>{{ $optionLabel }}</option>
         @endforeach
     </select>
     @error($name)

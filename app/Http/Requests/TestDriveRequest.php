@@ -60,6 +60,7 @@ class TestDriveRequest extends FormRequest
             'preferred_time' => ['required', 'string', Rule::in(TestDrive::TIME_SLOTS)],
             'phone' => ['required', 'regex:'.self::PHONE_REGEX],
             'notes' => ['nullable', 'string', 'max:'.self::MAX_NOTES_LENGTH],
+            'has_sim' => ['accepted'],
         ];
     }
 
@@ -111,6 +112,7 @@ class TestDriveRequest extends FormRequest
             'preferred_time' => 'jam',
             'phone' => 'nomor WhatsApp',
             'notes' => 'catatan',
+            'has_sim' => 'pernyataan SIM A',
         ];
     }
 
@@ -129,6 +131,7 @@ class TestDriveRequest extends FormRequest
             'preferred_date.before_or_equal' => "Tanggal test drive paling lambat {$last}.",
             'preferred_time.in' => 'Pilih jam antara 09:00 dan 16:00 WIB.',
             'phone.regex' => 'Nomor WhatsApp tidak valid. Gunakan format 08xx (10-13 digit).',
+            'has_sim.accepted' => 'Anda wajib menyetujui pernyataan kepemilikan SIM A aktif untuk melakukan booking test drive.',
         ];
     }
 }

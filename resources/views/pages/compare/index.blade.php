@@ -184,6 +184,36 @@
                                 @endforeach
                             </tr>
                             <tr>
+                                <th scope="row" class="compare-label">Status Pajak</th>
+                                @foreach ($rows as $row)
+                                    <td>{{ $row['car']->tax_status ?: ($row['car']->isNew() ? 'Mobil Baru' : '-') }}</td>
+                                @endforeach
+                            </tr>
+                            <tr>
+                                <th scope="row" class="compare-label">Dokumen</th>
+                                @foreach ($rows as $row)
+                                    <td>{{ $row['car']->document_status ?: '-' }}</td>
+                                @endforeach
+                            </tr>
+                            <tr>
+                                <th scope="row" class="compare-label">Kepemilikan</th>
+                                @foreach ($rows as $row)
+                                    <td>{{ $row['car']->ownership_history ?: ($row['car']->isNew() ? 'Baru' : '-') }}</td>
+                                @endforeach
+                            </tr>
+                            <tr>
+                                <th scope="row" class="compare-label">Plat Nomor</th>
+                                @foreach ($rows as $row)
+                                    <td>{{ $row['car']->plate_type ? 'Plat '.$row['car']->plate_type : ($row['car']->isNew() ? 'Pilihan Baru' : '-') }}</td>
+                                @endforeach
+                            </tr>
+                            <tr>
+                                <th scope="row" class="compare-label">Garansi Dealer</th>
+                                @foreach ($rows as $row)
+                                    <td>{{ $row['car']->warranty_info ?: '-' }}</td>
+                                @endforeach
+                            </tr>
+                            <tr>
                                 <th scope="row" class="compare-label"><span class="visually-hidden">Aksi</span></th>
                                 @foreach ($rows as $row)
                                     @php($car = $row['car'])

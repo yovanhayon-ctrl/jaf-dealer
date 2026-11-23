@@ -37,9 +37,10 @@ class PurchaseRequestController extends Controller
 
         $purchaseRequests = $request->user()->purchaseRequests()
             ->with([
-                'car:id,brand_id,name,slug,year,is_active',
+                'car:id,brand_id,name,slug,year,is_active,color_palette',
                 'car.brand:id,name',
-                'car.primaryImage:id,car_id,path,thumb_path',
+                'car.primaryImage:id,car_id,path,thumb_path,color_name',
+                'car.images:id,car_id,path,thumb_path,color_name,sort_order',
                 'testimonial:id,purchase_request_id,rating,comment,status,admin_note',
                 'paymentProofs:id,purchase_request_id,type,method,amount,paid_on,file_path,status,admin_note,created_at',
                 'paymentRefunds:id,purchase_request_id,amount,refunded_on,method,file_path,note',

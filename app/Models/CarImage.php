@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Storage;
 
-#[Fillable(['car_id', 'path', 'thumb_path', 'is_primary', 'sort_order'])]
+#[Fillable(['car_id', 'path', 'thumb_path', 'is_primary', 'sort_order', 'color_name', 'color_hex'])]
 class CarImage extends Model
 {
     public const DISK = 'public';

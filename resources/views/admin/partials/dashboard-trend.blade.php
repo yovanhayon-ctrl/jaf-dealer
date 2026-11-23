@@ -14,9 +14,9 @@
         <span class="dashboard-section-meta">· {{ $trend[0]['label'] }} – {{ $trend[array_key_last($trend)]['label'] }}</span>
     </h3>
 
-    <div class="row g-4">
+    <div class="row g-4 align-items-start">
         <div class="col-xl-6">
-            <div class="card h-100">
+            <div class="card">
                 <div class="card-header bg-transparent border-0 pt-3 px-3">
                     <h4 class="h6 mb-0">Aktivitas Customer per Bulan</h4>
                     <p class="small text-muted mb-0">Jumlah yang masuk (tanggal dibuat).</p>
@@ -26,37 +26,43 @@
                         <canvas data-chart="activity" data-chart-data='@json($charts['activity'])'
                                 role="img" aria-label="Grafik garis aktivitas customer per bulan, rinciannya ada di tabel di bawah."></canvas>
                     </div>
-                    <details class="mt-2 small">
-                        <summary class="text-muted">Lihat angka</summary>
-                        <div class="table-responsive mt-2">
-                            <table class="table table-sm mb-0">
-                                <thead>
-                                    <tr>
-                                        <th scope="col">Bulan</th>
-                                        <th scope="col" class="text-end">Pengajuan</th>
-                                        <th scope="col" class="text-end">Test drive</th>
-                                        <th scope="col" class="text-end">Servis</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach ($trend as $month)
+                    <div class="mt-2 small">
+                        <button type="button" class="btn btn-sm btn-link text-muted p-0 text-decoration-none d-inline-flex align-items-center gap-1 trend-toggle-btn"
+                                data-bs-toggle="collapse" data-bs-target="#tabel-angka-aktivitas" aria-expanded="false" aria-controls="tabel-angka-aktivitas">
+                            <i class="bi bi-caret-right-fill small trend-toggle-icon"></i>
+                            <span>Lihat angka</span>
+                        </button>
+                        <div class="collapse" id="tabel-angka-aktivitas">
+                            <div class="table-responsive mt-2">
+                                <table class="table table-sm mb-0">
+                                    <thead>
                                         <tr>
-                                            <th scope="row" class="fw-normal">{{ $month['label'] }}</th>
-                                            <td class="text-end">{{ $month['purchases'] }}</td>
-                                            <td class="text-end">{{ $month['test_drives'] }}</td>
-                                            <td class="text-end">{{ $month['service_bookings'] }}</td>
+                                            <th scope="col">Bulan</th>
+                                            <th scope="col" class="text-end">Pengajuan</th>
+                                            <th scope="col" class="text-end">Test drive</th>
+                                            <th scope="col" class="text-end">Servis</th>
                                         </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($trend as $month)
+                                            <tr>
+                                                <th scope="row" class="fw-normal">{{ $month['label'] }}</th>
+                                                <td class="text-end">{{ $month['purchases'] }}</td>
+                                                <td class="text-end">{{ $month['test_drives'] }}</td>
+                                                <td class="text-end">{{ $month['service_bookings'] }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                    </details>
+                    </div>
                 </div>
             </div>
         </div>
 
         <div class="col-xl-6">
-            <div class="card h-100">
+            <div class="card">
                 <div class="card-header bg-transparent border-0 pt-3 px-3">
                     <h4 class="h6 mb-0">Penjualan per Bulan</h4>
                     <p class="small text-muted mb-0">Disetujui/selesai, menurut tanggal pengajuan.</p>
@@ -66,29 +72,35 @@
                         <canvas data-chart="sales" data-chart-data='@json($charts['sales'])'
                                 role="img" aria-label="Grafik unit terjual dan nilai penjualan per bulan, rinciannya ada di tabel di bawah."></canvas>
                     </div>
-                    <details class="mt-2 small">
-                        <summary class="text-muted">Lihat angka</summary>
-                        <div class="table-responsive mt-2">
-                            <table class="table table-sm mb-0">
-                                <thead>
-                                    <tr>
-                                        <th scope="col">Bulan</th>
-                                        <th scope="col" class="text-end">Unit terjual</th>
-                                        <th scope="col" class="text-end">Nilai penjualan</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach ($trend as $month)
+                    <div class="mt-2 small">
+                        <button type="button" class="btn btn-sm btn-link text-muted p-0 text-decoration-none d-inline-flex align-items-center gap-1 trend-toggle-btn"
+                                data-bs-toggle="collapse" data-bs-target="#tabel-angka-penjualan" aria-expanded="false" aria-controls="tabel-angka-penjualan">
+                            <i class="bi bi-caret-right-fill small trend-toggle-icon"></i>
+                            <span>Lihat angka</span>
+                        </button>
+                        <div class="collapse" id="tabel-angka-penjualan">
+                            <div class="table-responsive mt-2">
+                                <table class="table table-sm mb-0">
+                                    <thead>
                                         <tr>
-                                            <th scope="row" class="fw-normal">{{ $month['label'] }}</th>
-                                            <td class="text-end">{{ $month['units_sold'] }}</td>
-                                            <td class="text-end"><x-price :amount="$month['sales_value']" /></td>
+                                            <th scope="col">Bulan</th>
+                                            <th scope="col" class="text-end">Unit terjual</th>
+                                            <th scope="col" class="text-end">Nilai penjualan</th>
                                         </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($trend as $month)
+                                            <tr>
+                                                <th scope="row" class="fw-normal">{{ $month['label'] }}</th>
+                                                <td class="text-end">{{ $month['units_sold'] }}</td>
+                                                <td class="text-end"><x-price :amount="$month['sales_value']" /></td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                    </details>
+                    </div>
                 </div>
             </div>
         </div>

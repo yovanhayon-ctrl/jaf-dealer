@@ -42,6 +42,7 @@ use App\Http\Controllers\Mechanic\JobController as MechanicJobController;
 use App\Http\Controllers\Mechanic\NotificationController as MechanicNotificationController;
 use App\Http\Controllers\Mechanic\RatingController as MechanicRatingController;
 use App\Http\Controllers\Mechanic\ServiceController as MechanicServiceController;
+use App\Http\Controllers\NotificationCountController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\PromoController;
 use App\Http\Controllers\PurchaseRequestController;
@@ -186,6 +187,8 @@ Route::middleware('auth')->group(function () {
         Route::patch('notifikasi/baca-semua', [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
         Route::get('notifikasi/{notification}', [NotificationController::class, 'open'])->whereUuid('notification')->name('notifications.open');
     });
+
+    Route::get('notifikasi/unread-count', NotificationCountController::class)->name('notifications.unread-count');
 });
 
 /*
@@ -216,6 +219,10 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
             Route::get('/', 'index')->name('index');
             Route::post('/', 'store')->name('store');
             Route::patch('{image}/utama', 'makePrimary')->name('primary');
+            Route::patch('{image}/warna', 'updateColor')->name('color');
+            Route::post('warna', 'storeColorPalette')->name('colors.store');
+            Route::patch('warna/stok', 'updateColorPaletteStock')->name('colors.stock');
+            Route::delete('warna/{index}', 'destroyColorPalette')->name('colors.destroy');
             Route::patch('{image}/{direction}', 'move')->whereIn('direction', ['naik', 'turun'])->name('move');
             Route::delete('{image}', 'destroy')->name('destroy');
         });
@@ -311,12 +318,15 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::controller(AdminServiceBookingController::class)->prefix('servis')->name('service-bookings.')->middleware('can:service-bookings.view')->group(function () {
         Route::get('/', 'index')->name('index');
         Route::get('{serviceBooking}', 'show')->name('show');
+        Route::get('{serviceBooking}/cetak-spk', 'printWorkOrder')->name('print-work-order');
         Route::patch('{serviceBooking}/status', 'updateStatus')->middleware('can:service-bookings.manage')->name('update-status');
         Route::patch('{serviceBooking}/jadwal', 'reschedule')->middleware('can:service-bookings.manage')->name('reschedule');
         Route::patch('{serviceBooking}/mekanik', 'assignMechanic')->middleware('can:service-bookings.manage')->name('assign-mechanic');
         Route::patch('{serviceBooking}/pekerjaan/{task}', 'updateTask')->middleware('can:service-bookings.manage')->scopeBindings()->name('tasks.update');
         Route::post('{serviceBooking}/pekerjaan', 'addTask')->middleware('can:service-bookings.manage')->name('tasks.store');
         Route::delete('{serviceBooking}/pekerjaan/{task}', 'removeTask')->middleware('can:service-bookings.manage')->scopeBindings()->name('tasks.destroy');
+        Route::post('{serviceBooking}/spare-parts', 'addSparePart')->middleware('can:service-bookings.manage')->name('spare-parts.store');
+        Route::delete('{serviceBooking}/spare-parts/{sparePart}', 'removeSparePart')->middleware('can:service-bookings.manage')->scopeBindings()->name('spare-parts.destroy');
         Route::patch('{serviceBooking}/temuan', 'updateFindings')->middleware('can:service-bookings.manage')->name('findings');
     });
 

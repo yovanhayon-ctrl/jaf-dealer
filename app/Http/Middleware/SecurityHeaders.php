@@ -21,7 +21,7 @@ class SecurityHeaders
         "script-src 'self' https://cdn.jsdelivr.net",
         "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
         "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com",
-        "img-src 'self' data: blob:",
+        "img-src 'self' data: blob: https: http:",
         'frame-src https://www.google.com https://maps.google.com',
         "connect-src 'self'",
         "object-src 'none'",

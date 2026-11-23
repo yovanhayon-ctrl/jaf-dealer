@@ -300,4 +300,22 @@ class User extends Authenticatable
     {
         $this->favoriteCarIdsCache = null;
     }
+
+    /**
+     * Pesan WhatsApp (wa.me) untuk admin/sales menghubungi customer secara manual.
+     */
+    public function whatsappContactUrl(?self $staff = null): ?string
+    {
+        $number = preg_replace('/^0/', '62', preg_replace('/\D/', '', (string) $this->phone));
+
+        if ($number === '') {
+            return null;
+        }
+
+        $dealerName = (string) config('dealer.name', 'JAF Dealer');
+        $sender = $staff?->name ? "saya {$staff->name} dari {$dealerName}" : "kami dari {$dealerName}";
+        $text = "Halo {$this->name}, {$sender}. Apakah ada yang bisa kami bantu terkait layanan di {$dealerName}? Terima kasih.";
+
+        return "https://wa.me/{$number}?text=".rawurlencode($text);
+    }
 }

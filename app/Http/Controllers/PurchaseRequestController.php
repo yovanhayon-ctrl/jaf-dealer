@@ -28,7 +28,8 @@ class PurchaseRequestController extends Controller
 
         $car->load(['brand:id,name', 'category:id,name', 'primaryImage:id,car_id,path,thumb_path', 'activePromos:id,car_id,discount_amount']);
         $user = $request->user();
-        $price = $car->finalPrice();
+        $selectedColor = (string) $request->query('warna');
+        $price = $car->finalPriceForColor($selectedColor);
 
         // Nilai awal dari halaman simulasi (?metode=kredit&dp=…&tenor=…).
         $downPayment = (int) preg_replace('/\D/', '', (string) $request->query('dp'));
@@ -46,6 +47,8 @@ class PurchaseRequestController extends Controller
             'defaultTenor' => in_array($tenor, $credit->tenors(), true) ? $tenor : CreditSimulationController::DEFAULT_TENOR,
             'tenors' => $credit->tenors(),
             'rates' => config('credit.rates'),
+            'selectedColor' => $selectedColor ?: null,
+            'colorSwatches' => $car->colorSwatches(),
         ]);
     }
 

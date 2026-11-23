@@ -9,16 +9,21 @@
     [$handled, $total] = $booking->taskProgress();
     $mechanicErrors = $errors->getBag('mechanic');
     $taskErrors = $errors->getBag('task');
-    $canManageChecklist = in_array($booking->status, [ServiceBooking::STATUS_CONFIRMED, ServiceBooking::STATUS_IN_PROGRESS, ServiceBooking::STATUS_COMPLETED], true);
+    $canManageChecklist = in_array($booking->status, [ServiceBooking::STATUS_IN_PROGRESS, ServiceBooking::STATUS_COMPLETED], true);
 @endphp
 
 <div class="card mb-4" id="pekerjaan">
     <div class="card-body p-4">
-        <div class="d-flex flex-wrap align-items-baseline justify-content-between gap-2 mb-3">
-            <h3 class="admin-card-title mb-0">Mekanik & Pekerjaan</h3>
-            @if ($total > 0)
-                <span class="small text-muted">{{ $handled }} dari {{ $total }} pekerjaan ditangani</span>
-            @endif
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <div>
+                <h3 class="admin-card-title mb-0">Mekanik & Pekerjaan</h3>
+                @if ($total > 0)
+                    <span class="small text-muted">{{ $handled }} dari {{ $total }} pekerjaan ditangani</span>
+                @endif
+            </div>
+            <a href="{{ route('admin.service-bookings.print-work-order', $booking) }}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Cetak Nota Checklist Servis">
+                <i class="bi bi-printer me-1"></i>Cetak Nota Checklist
+            </a>
         </div>
 
         @if ($booking->canBeAssigned())
@@ -29,8 +34,12 @@
                     <label for="mechanic_id" class="visually-hidden">Mekanik</label>
                     <select id="mechanic_id" name="mechanic_id" @class(['form-select', 'is-invalid' => $mechanicErrors->has('mechanic_id')])>
                         <option value="">{{ $mechanics === [] ? 'Belum ada akun mekanik aktif' : 'Pilih mekanik' }}</option>
-                        @foreach ($mechanics as $id => $name)
-                            <option value="{{ $id }}" @selected((int) old('mechanic_id', $booking->mechanic_id) === $id)>{{ $name }}</option>
+                        @foreach ($mechanics as $id => $item)
+                            @php
+                                $label = is_array($item) ? ($item['label'] ?? $item['name'] ?? '') : $item;
+                                $disabled = is_array($item) ? ($item['disabled'] ?? false) : false;
+                            @endphp
+                            <option value="{{ $id }}" @selected((int) old('mechanic_id', $booking->mechanic_id) === $id) @disabled($disabled)>{{ $label }}</option>
                         @endforeach
                     </select>
                     @if ($mechanicErrors->has('mechanic_id'))
@@ -62,6 +71,11 @@
             @if ($booking->finished_at)
                 <span class="text-muted ms-2">Selesai {{ $booking->finished_at->translatedFormat('d M H:i') }}</span>
             @endif
+            @if ($booking->mechanic_id)
+                <a href="{{ route('admin.service-bookings.print-work-order', $booking) }}" target="_blank" class="btn btn-sm btn-outline-secondary py-0 ms-2" title="Cetak SPK / Struk Kerja Mekanik">
+                    <i class="bi bi-printer me-1"></i>Cetak SPK
+                </a>
+            @endif
         </p>
 
         @if ($booking->tasks->isEmpty())
@@ -73,6 +87,12 @@
                 @endif
             </p>
         @else
+            @if ($booking->status === ServiceBooking::STATUS_CONFIRMED)
+                <div class="alert alert-light border small mb-3">
+                    <i class="bi bi-info-circle me-1 text-primary"></i>Checklist pekerjaan baru dapat dicentang setelah status servis diubah ke <strong>Sedang Dikerjakan</strong>.
+                </div>
+            @endif
+
             <ul class="service-task-list list-unstyled small mb-3">
                 @foreach ($booking->tasks as $task)
                     <li @class(['is-done' => $task->isDone(), 'is-skipped' => $task->isSkipped(), 'align-items-center' => true])>

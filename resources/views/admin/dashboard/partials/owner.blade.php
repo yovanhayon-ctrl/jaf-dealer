@@ -22,12 +22,15 @@
         </div>
     </div>
 
-    <div class="row row-cols-1 row-cols-sm-3 g-3 mb-4">
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-xl-4 g-3 mb-4">
         <div class="col">
             <x-stat-card label="Unit Terjual (Bulan Ini)" :value="$ownerStats['units_sold']" icon="bi-bag-check" color="navy" />
         </div>
         <div class="col">
             <x-stat-card label="Servis Selesai (Bulan Ini)" :value="$ownerStats['services_completed']" icon="bi-check-circle" color="blue" />
+        </div>
+        <div class="col">
+            <x-stat-card label="Omset Suku Cadang Servis" :value="$rupiah($ownerStats['service_spare_parts_revenue'])" icon="bi-tools" color="green" />
         </div>
         <div class="col">
             <x-stat-card label="Mobil Stok Habis" :value="$ownerStats['out_of_stock_cars']" icon="bi-box-seam" color="dark" />
@@ -66,7 +69,7 @@
                                 <td class="text-end">{{ $rupiah($m['sales_value']) }}</td>
                                 <td class="text-center">{{ $m['services_completed'] }}</td>
                                 <td class="text-end">{{ $rupiah($m['service_revenue']) }}</td>
-                                <td class="text-end fw-bold text-success">{{ $rupiah($m['total_revenue']) }}</td>
+                                <td class="text-end fw-bold text-body">{{ $rupiah($m['total_revenue']) }}</td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -75,3 +78,6 @@
         </div>
     </div>
 </section>
+
+{{-- Widget Performa Tim: Sales & Mekanik Terbaik --}}
+@include('admin.dashboard.partials.team-performance', ['showRevenue' => true])

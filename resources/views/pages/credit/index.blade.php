@@ -11,6 +11,23 @@
     $percent = fn (float $value) => rtrim(rtrim(number_format($value, 2, ',', '.'), '0'), ',').'%';
     $whatsapp = preg_replace('/\D/', '', (string) config('dealer.whatsapp'));
     $carTitle = $car ? "{$car->brand->name} {$car->name} {$car->year}" : null;
+
+    $carColorsMap = [];
+    foreach ($cars as $c) {
+        $swatches = $c->colorSwatches();
+        if (! empty($swatches)) {
+            $carColorsMap[$c->slug] = [
+                'primary' => $c->primaryImage?->color_name ?: ($swatches[0]['name'] ?? ''),
+                'colors' => array_map(fn ($s) => [
+                    'name' => $s['name'],
+                    'hex' => $s['hex'],
+                    'extra_price' => (int) ($s['extra_price'] ?? 0),
+                    'price' => $c->finalPriceForColor($s['name']),
+                    'stock' => (int) ($s['stock'] ?? 1),
+                ], $swatches),
+            ];
+        }
+    }
 @endphp
 
 @section('content')
@@ -41,7 +58,7 @@
                               data-max-price="{{ CreditSimulationController::MAX_PRICE }}">
                             <div class="mb-3">
                                 <label for="mobil" class="form-label">Mobil</label>
-                                <select id="mobil" name="mobil" class="form-select" data-credit-car>
+                                <select id="mobil" name="mobil" class="form-select" data-credit-car data-car-colors='@json($carColorsMap)'>
                                     <option value="">Isi harga sendiri</option>
                                     @foreach ($cars as $option)
                                         <option value="{{ $option->slug }}" data-price="{{ $option->finalPrice() }}" @selected($car?->is($option))>
@@ -50,6 +67,21 @@
                                     @endforeach
                                 </select>
                                 <div class="form-text">Harga mobil sudah termasuk potongan promo yang sedang berjalan.</div>
+                            </div>
+
+                            <div class="mb-3 @if (empty($colorOptions)) d-none @endif" data-credit-color-group>
+                                <label for="warna" class="form-label">Pilihan Warna Mobil</label>
+                                <select id="warna" name="warna" class="form-select" data-credit-color>
+                                    @foreach ($colorOptions as $cOpt)
+                                        <option value="{{ $cOpt['name'] }}"
+                                                data-price="{{ $cOpt['price'] }}"
+                                                data-extra-price="{{ $cOpt['extra_price'] }}"
+                                                @selected($selectedColor === $cOpt['name'])>
+                                            {{ $cOpt['name'] }} · {{ $rupiah($cOpt['price']) }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <div class="form-text">Harga dapat berbeda untuk warna edisi khusus.</div>
                             </div>
 
                             <div @class(['d-none' => $car !== null]) data-credit-price-group>
@@ -134,7 +166,13 @@
                                 {{-- Satu tombol utama; detail mobil, test drive, dan WhatsApp berupa tautan teks. --}}
                                 <div class="mt-4" data-credit-car-actions>
                                     @if ($result && $car->canBePurchased() && Route::has('purchase-requests.create'))
-                                        <a href="{{ route('purchase-requests.create', ['car' => $car, 'metode' => 'kredit', 'dp' => $result['down_payment'], 'tenor' => $result['tenor_months']]) }}"
+                                        @php
+                                            $applyQuery = ['car' => $car, 'metode' => 'kredit', 'dp' => $result['down_payment'], 'tenor' => $result['tenor_months']];
+                                            if (request()->filled('warna')) {
+                                                $applyQuery['warna'] = request('warna');
+                                            }
+                                        @endphp
+                                        <a href="{{ route('purchase-requests.create', $applyQuery) }}"
                                            class="btn btn-accent mb-3" data-credit-apply>
                                             <i class="bi bi-cart-check"></i>Ajukan dengan Simulasi Ini
                                         </a>

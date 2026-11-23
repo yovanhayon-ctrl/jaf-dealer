@@ -50,7 +50,7 @@
             <aside class="col-lg-3 d-none d-lg-block" aria-label="Filter">
                 <div class="card filter-sidebar">
                     <div class="card-body p-3">
-                        @include('pages.spare-parts._filter', ['filters' => $filters, 'categories' => $categories, 'idPrefix' => 'd_'])
+                        @include('pages.spare-parts._filter', ['filters' => $filters, 'categories' => $categories, 'carModels' => $carModels, 'idPrefix' => 'd_'])
                     </div>
                 </div>
             </aside>
@@ -92,7 +92,7 @@
             <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Tutup"></button>
         </div>
         <div class="offcanvas-body">
-            @include('pages.spare-parts._filter', ['filters' => $filters, 'categories' => $categories, 'idPrefix' => 'm_'])
+            @include('pages.spare-parts._filter', ['filters' => $filters, 'categories' => $categories, 'carModels' => $carModels, 'idPrefix' => 'm_'])
         </div>
     </div>
 @endsection

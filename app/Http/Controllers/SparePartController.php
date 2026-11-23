@@ -22,11 +22,53 @@ class SparePartController extends Controller
         'nama_asc' => ['Nama: A ke Z', 'name', 'asc'],
     ];
 
+    public const CAR_MODELS = [
+        'universal' => [
+            'label' => 'Universal / Semua Mobil',
+            'keywords' => ['universal', 'semua'],
+        ],
+        'livina' => [
+            'label' => 'Livina / Grand Livina',
+            'keywords' => ['livina', 'grand livina'],
+        ],
+        'xtrail' => [
+            'label' => 'X-Trail',
+            'keywords' => ['x-trail', 'xtrail'],
+        ],
+        'serena' => [
+            'label' => 'Serena',
+            'keywords' => ['serena'],
+        ],
+        'juke' => [
+            'label' => 'Juke',
+            'keywords' => ['juke'],
+        ],
+        'magnite' => [
+            'label' => 'Magnite',
+            'keywords' => ['magnite'],
+        ],
+        'kicks' => [
+            'label' => 'Kicks e-Power',
+            'keywords' => ['kicks'],
+        ],
+        'navara' => [
+            'label' => 'Navara',
+            'keywords' => ['navara'],
+        ],
+        'sport' => [
+            'label' => 'GT-R / 350Z / Sport',
+            'keywords' => ['gt-r', 'gtr', '350z', '370z', 'sport'],
+        ],
+    ];
+
     public function index(Request $request): View
     {
         $search = trim((string) $request->query('q'));
         $category = array_key_exists((string) $request->query('kategori'), SparePart::CATEGORIES)
             ? (string) $request->query('kategori')
+            : null;
+        $model = array_key_exists((string) $request->query('model'), self::CAR_MODELS)
+            ? (string) $request->query('model')
             : null;
         $inStockOnly = $request->boolean('tersedia');
 
@@ -52,6 +94,16 @@ class SparePartController extends Controller
                 });
             })
             ->when($category !== null, fn (Builder $query) => $query->where('category', $category))
+            ->when($model !== null, function (Builder $query) use ($model) {
+                $keywords = self::CAR_MODELS[$model]['keywords'];
+                $query->where(function (Builder $sub) use ($keywords) {
+                    foreach ($keywords as $kw) {
+                        $sub->orWhere('compatibility', 'like', "%{$kw}%")
+                            ->orWhere('description', 'like', "%{$kw}%")
+                            ->orWhere('name', 'like', "%{$kw}%");
+                    }
+                });
+            })
             ->when($minPrice !== null && $minPrice > 0, fn (Builder $query) => $query->where('price', '>=', $minPrice))
             ->when($maxPrice !== null && $maxPrice > 0, fn (Builder $query) => $query->where('price', '<=', $maxPrice))
             ->when($inStockOnly, fn (Builder $query) => $query->where('stock', '>', 0))
@@ -63,6 +115,7 @@ class SparePartController extends Controller
         $filters = [
             'q' => $search,
             'kategori' => $category,
+            'model' => $model,
             'harga_min' => $minPrice,
             'harga_max' => $maxPrice,
             'tersedia' => $inStockOnly,
@@ -73,6 +126,7 @@ class SparePartController extends Controller
         $activeQuery = array_filter([
             'q' => $search !== '' ? $search : null,
             'kategori' => $category,
+            'model' => $model,
             'harga_min' => $minPrice,
             'harga_max' => $maxPrice,
             'tersedia' => $inStockOnly ? '1' : null,
@@ -81,13 +135,14 @@ class SparePartController extends Controller
 
         $sortQuery = Arr::except($activeQuery, ['urut']);
 
-        $chips = $this->buildActiveChips($search, $category, $minPrice, $maxPrice, $inStockOnly, $activeQuery);
+        $chips = $this->buildActiveChips($search, $category, $model, $minPrice, $maxPrice, $inStockOnly, $activeQuery);
 
-        $hasFilters = $search !== '' || $category !== null || $minPrice !== null || $maxPrice !== null || $inStockOnly;
+        $hasFilters = $search !== '' || $category !== null || $model !== null || $minPrice !== null || $maxPrice !== null || $inStockOnly;
 
         return view('pages.spare-parts.index', [
             'spareParts' => $spareParts,
             'categories' => SparePart::CATEGORIES,
+            'carModels' => self::CAR_MODELS,
             'filters' => $filters,
             'chips' => $chips,
             'sortQuery' => $sortQuery,
@@ -99,7 +154,7 @@ class SparePartController extends Controller
      * @param  array<string, mixed>  $activeQuery
      * @return array<int, array{label: string, url: string}>
      */
-    private function buildActiveChips(?string $search, ?string $category, ?int $minPrice, ?int $maxPrice, bool $inStockOnly, array $activeQuery): array
+    private function buildActiveChips(?string $search, ?string $category, ?string $model, ?int $minPrice, ?int $maxPrice, bool $inStockOnly, array $activeQuery): array
     {
         $rupiah = fn (int $amount) => 'Rp '.number_format($amount, 0, ',', '.');
         $chips = [];
@@ -115,6 +170,13 @@ class SparePartController extends Controller
             $chips[] = [
                 'label' => SparePart::CATEGORIES[$category],
                 'url' => route('spare-parts.index', Arr::except($activeQuery, ['kategori'])),
+            ];
+        }
+
+        if ($model !== null && isset(self::CAR_MODELS[$model])) {
+            $chips[] = [
+                'label' => 'Mobil: '.self::CAR_MODELS[$model]['label'],
+                'url' => route('spare-parts.index', Arr::except($activeQuery, ['model'])),
             ];
         }
 
@@ -157,10 +219,14 @@ class SparePartController extends Controller
             ->limit(4)
             ->get();
 
+        $waNumber = preg_replace('/\D/', '', (string) config('dealer.whatsapp'));
+        $waBaseUrl = $waNumber !== '' ? "https://wa.me/{$waNumber}" : null;
+
         return view('pages.spare-parts.show', [
             'sparePart' => $sparePart,
             'relatedParts' => $relatedParts,
             'whatsappUrl' => $sparePart->whatsappOrderUrl(),
+            'waBaseUrl' => $waBaseUrl,
         ]);
     }
 }

@@ -20,6 +20,8 @@ class SparePartRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        $imageUrl = trim((string) $this->input('image_url'));
+
         $this->merge([
             'part_number' => strtoupper(trim((string) $this->input('part_number'))),
             'name' => Str::squish((string) $this->input('name')),
@@ -27,6 +29,7 @@ class SparePartRequest extends FormRequest
             'stock' => $this->digitsOnly('stock'),
             'min_stock' => $this->digitsOnly('min_stock') ?: 5,
             'is_active' => $this->boolean('is_active', true),
+            'image_url' => $imageUrl !== '' ? $imageUrl : null,
         ]);
     }
 
@@ -54,6 +57,8 @@ class SparePartRequest extends FormRequest
             'unit' => ['required', 'string', Rule::in(array_keys(SparePart::UNITS))],
             'description' => ['nullable', 'string', 'max:2000'],
             'image' => ['nullable', File::image()->types(['jpg', 'jpeg', 'png', 'webp'])->max(2048)],
+            'image_url' => ['nullable', 'string', 'url', 'max:2048'],
+            'save_to_storage' => ['nullable', 'boolean'],
             'remove_image' => ['nullable', 'boolean'],
             'is_active' => ['boolean'],
         ];
@@ -74,7 +79,9 @@ class SparePartRequest extends FormRequest
             'min_stock' => 'batas minimum stok',
             'unit' => 'satuan',
             'description' => 'deskripsi',
-            'image' => 'foto spare part',
+            'image' => 'file foto produk',
+            'image_url' => 'link URL foto produk',
+            'is_active' => 'status aktif',
         ];
     }
 }

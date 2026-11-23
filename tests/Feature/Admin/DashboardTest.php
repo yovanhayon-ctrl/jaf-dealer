@@ -3,6 +3,7 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\Car;
+use App\Models\MechanicRating;
 use App\Models\PurchaseRequest;
 use App\Models\ServiceBooking;
 use App\Models\TestDrive;
@@ -65,9 +66,11 @@ class DashboardTest extends TestCase
                 'awaiting_response' => 0,
                 'unconfirmed_test_drives_tomorrow' => 0,
                 'unconfirmed_service_bookings_tomorrow' => 0,
+                'active_spare_parts' => 0,
+                'low_stock_spare_parts' => 0,
             ])
             ->assertDontSee('class="dashboard-attention', false)
-            ->assertSeeInOrder(['Mobil Aktif', 'Stok Habis', 'Test Drive Pending', 'Pengajuan Pending', 'Servis Pending', 'Customer']);
+            ->assertSeeInOrder(['Mobil Aktif', 'Stok Habis', 'Test Drive Pending', 'Pengajuan Pending', 'Servis Pending', 'Suku Cadang', 'Customer']);
     }
 
     public function test_tabel_hanya_menampilkan_lima_data_yang_relevan(): void
@@ -172,6 +175,60 @@ class DashboardTest extends TestCase
         $this->actingAs($admin)->get('/admin/dashboard')
             ->assertOk()
             ->assertSee('href="'.e(route('admin.users.index', ['role' => 'customer'])).'"', false);
+    }
+
+    public function test_dashboard_menampilkan_widget_performa_tim_terbaik(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $customer = User::factory()->create();
+        $car = Car::factory()->create(['price' => 300_000_000]);
+
+        $sales1 = User::factory()->sales()->create(['name' => 'Sales Bintang']);
+        $sales2 = User::factory()->sales()->create(['name' => 'Sales Hebat']);
+
+        // Sales 1 punya 2 unit terjual, Sales 2 punya 1 unit terjual
+        PurchaseRequest::factory()->count(2)->status('approved')->recycle($car)->create([
+            'sales_id' => $sales1->id, 'car_price' => 300_000_000,
+        ]);
+        PurchaseRequest::factory()->status('completed')->recycle($car)->create([
+            'sales_id' => $sales2->id, 'car_price' => 200_000_000,
+        ]);
+
+        $mechanic1 = User::factory()->mechanic()->create(['name' => 'Mekanik Teladan']);
+        $mechanic2 = User::factory()->mechanic()->create(['name' => 'Mekanik Handal']);
+
+        $b1 = ServiceBooking::factory()->status('completed')->create(['mechanic_id' => $mechanic1->id]);
+        $b2 = ServiceBooking::factory()->status('completed')->create(['mechanic_id' => $mechanic2->id]);
+
+        MechanicRating::create(['service_booking_id' => $b1->id, 'mechanic_id' => $mechanic1->id, 'user_id' => $customer->id, 'rating' => 5]);
+        MechanicRating::create(['service_booking_id' => $b2->id, 'mechanic_id' => $mechanic2->id, 'user_id' => $customer->id, 'rating' => 4]);
+
+        $response = $this->actingAs($admin)->get('/admin/dashboard')->assertOk();
+
+        $response->assertSee('Performa Tim Terbaik')
+            ->assertSee('Sales Terbaik')
+            ->assertSee('Mekanik Terbaik')
+            ->assertSee('Sales Bintang')
+            ->assertSee('Sales Hebat')
+            ->assertSee('Mekanik Teladan')
+            ->assertSee('Mekanik Handal')
+            ->assertSee('Terbaik #1');
+    }
+
+    public function test_dashboard_owner_menampilkan_widget_performa_tim_dengan_omset(): void
+    {
+        $owner = User::factory()->owner()->create();
+        $sales = User::factory()->sales()->create(['name' => 'Sales Juara']);
+
+        PurchaseRequest::factory()->status('approved')->create([
+            'sales_id' => $sales->id, 'car_price' => 500_000_000,
+        ]);
+
+        $this->actingAs($owner)->get('/admin/dashboard')
+            ->assertOk()
+            ->assertSee('Performa Tim Terbaik')
+            ->assertSee('Sales Juara')
+            ->assertSee('Rp 500.000.000');
     }
 
     private function seedDashboardData(int $count): void

@@ -17,7 +17,8 @@ use InvalidArgumentException;
 
 #[Fillable([
     'brand_id', 'category_id', 'name', 'slug', 'vehicle_condition', 'year', 'mileage',
-    'price', 'transmission', 'fuel_type', 'engine_cc', 'seats', 'color', 'stock',
+    'tax_status', 'document_status', 'ownership_history', 'plate_type', 'warranty_info',
+    'price', 'transmission', 'fuel_type', 'engine_cc', 'seats', 'color', 'color_palette', 'stock',
     'description', 'is_active', 'is_featured',
 ])]
 class Car extends Model
@@ -64,7 +65,7 @@ class Car extends Model
 
     /** Relasi yang dipakai x-car-card; di-eager load agar tidak terjadi N+1. */
     public const CARD_RELATIONS = [
-        'brand:id,name,slug', 'category:id,name,slug', 'primaryImage:id,car_id,path,thumb_path',
+        'brand:id,name,slug', 'category:id,name,slug', 'primaryImage:id,car_id,path,thumb_path,color_name',
         'activePromos:id,car_id,discount_amount',
     ];
 
@@ -79,6 +80,7 @@ class Car extends Model
             'stock' => 'integer',
             'is_active' => 'boolean',
             'is_featured' => 'boolean',
+            'color_palette' => 'array',
         ];
     }
 
@@ -237,6 +239,11 @@ class Car extends Model
         return $this->vehicle_condition === self::CONDITION_NEW;
     }
 
+    public function isUsed(): bool
+    {
+        return $this->vehicle_condition === self::CONDITION_USED;
+    }
+
     public function inStock(): bool
     {
         return $this->stock > 0;
@@ -284,8 +291,230 @@ class Car extends Model
         return $this->price - $this->promoDiscount();
     }
 
+    /**
+     * Biaya tambahan untuk varian warna tertentu (misal: cat khusus heritage/metallic).
+     */
+    public function colorExtraPrice(?string $colorName): int
+    {
+        if ($colorName === null || $colorName === '') {
+            return 0;
+        }
+
+        foreach ($this->colorSwatches() as $swatch) {
+            if (strcasecmp($swatch['name'], $colorName) === 0) {
+                return (int) ($swatch['extra_price'] ?? 0);
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * Harga mobil disesuaikan dengan biaya tambahan warna (sebelum diskon promo).
+     */
+    public function priceForColor(?string $colorName): int
+    {
+        return $this->price + $this->colorExtraPrice($colorName);
+    }
+
+    /**
+     * Harga final mobil untuk warna tertentu (setelah dipotong diskon promo aktif).
+     */
+    public function finalPriceForColor(?string $colorName): int
+    {
+        return max(0, $this->priceForColor($colorName) - $this->promoDiscount());
+    }
+
     public function hasPromoPrice(): bool
     {
         return $this->promoDiscount() > 0;
+    }
+
+    /**
+     * Daftar varian warna untuk galeri mobil (bisa kustom per mobil atau bawaan model).
+     *
+     * @return list<array{name: string, hex: string, stock: int, extra_price: int}>
+     */
+    public function colorSwatches(): array
+    {
+        if (! empty($this->color_palette) && is_array($this->color_palette)) {
+            return array_values(array_map(function ($item) {
+                return [
+                    'name' => (string) ($item['name'] ?? ''),
+                    'hex' => (string) ($item['hex'] ?? '#000000'),
+                    'stock' => isset($item['stock']) ? (int) $item['stock'] : ($this->stock > 0 ? 1 : 0),
+                    'extra_price' => max(0, (int) ($item['extra_price'] ?? 0)),
+                ];
+            }, $this->color_palette));
+        }
+
+        $palettes = config('car_colors', []);
+        $brandName = $this->relationLoaded('brand') ? $this->brand?->name : ($this->brand_id ? $this->brand()->value('name') : 'Nissan');
+        $fullName = trim(($brandName ?: 'Nissan')." {$this->name}");
+
+        $swatches = $palettes[$fullName] ?? $palettes[$this->name] ?? null;
+
+        if ($swatches !== null) {
+            return array_values(array_map(function ($item) {
+                return [
+                    'name' => (string) ($item['name'] ?? ''),
+                    'hex' => (string) ($item['hex'] ?? '#000000'),
+                    'stock' => isset($item['stock']) ? (int) $item['stock'] : ($this->stock > 0 ? 1 : 0),
+                    'extra_price' => max(0, (int) ($item['extra_price'] ?? 0)),
+                ];
+            }, $swatches));
+        }
+
+        $defaultColor = $this->color ?: 'Warna Standar';
+
+        return [
+            ['name' => $defaultColor, 'hex' => '#4A5568', 'stock' => max(0, (int) $this->stock), 'extra_price' => 0],
+        ];
+    }
+
+    /**
+     * Cek apakah warna tertentu memiliki stok unit tersedia.
+     */
+    public function isColorInStock(?string $colorName): bool
+    {
+        if (! $this->inStock()) {
+            return false;
+        }
+
+        if ($colorName === null || $colorName === '') {
+            return true;
+        }
+
+        foreach ($this->colorSwatches() as $swatch) {
+            if (strcasecmp($swatch['name'], $colorName) === 0) {
+                return ($swatch['stock'] ?? 0) > 0;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Dapatkan sisa stok untuk warna tertentu.
+     */
+    public function colorStock(?string $colorName): int
+    {
+        if (! $this->inStock()) {
+            return 0;
+        }
+
+        if ($colorName === null || $colorName === '') {
+            return (int) $this->stock;
+        }
+
+        foreach ($this->colorSwatches() as $swatch) {
+            if (strcasecmp($swatch['name'], $colorName) === 0) {
+                return (int) ($swatch['stock'] ?? 0);
+            }
+        }
+
+        return (int) $this->stock;
+    }
+
+    /**
+     * Kurangi stok untuk warna tertentu (dan perbarui total stok mobil).
+     */
+    public function decrementColorStock(?string $colorName): void
+    {
+        if (! empty($this->color_palette) && is_array($this->color_palette) && $colorName) {
+            $palette = $this->color_palette;
+            $found = false;
+
+            foreach ($palette as &$item) {
+                if (strcasecmp((string) ($item['name'] ?? ''), $colorName) === 0) {
+                    $item['stock'] = max(0, ((int) ($item['stock'] ?? 1)) - 1);
+                    $found = true;
+                    break;
+                }
+            }
+            unset($item);
+
+            if ($found) {
+                $this->color_palette = $palette;
+                $this->stock = max(0, array_sum(array_map(fn ($i) => (int) ($i['stock'] ?? 0), $palette)));
+                $this->save();
+
+                return;
+            }
+        }
+
+        $this->decrement('stock');
+    }
+
+    /**
+     * Tambahkan stok untuk warna tertentu (dan perbarui total stok mobil).
+     */
+    public function incrementColorStock(?string $colorName): void
+    {
+        if (! empty($this->color_palette) && is_array($this->color_palette) && $colorName) {
+            $palette = $this->color_palette;
+            $found = false;
+
+            foreach ($palette as &$item) {
+                if (strcasecmp((string) ($item['name'] ?? ''), $colorName) === 0) {
+                    $item['stock'] = ((int) ($item['stock'] ?? 0)) + 1;
+                    $found = true;
+                    break;
+                }
+            }
+            unset($item);
+
+            if ($found) {
+                $this->color_palette = $palette;
+                $this->stock = array_sum(array_map(fn ($i) => (int) ($i['stock'] ?? 0), $palette));
+                $this->save();
+
+                return;
+            }
+        }
+
+        $this->increment('stock');
+    }
+
+    /**
+     * Dapatkan gambar yang cocok dengan nama varian warna, atau fallback ke primaryImage.
+     */
+    public function imageForColor(?string $colorName): ?CarImage
+    {
+        if ($colorName !== null && $colorName !== '') {
+            // 1. Cari berdasarkan kecocokan nama warna eksplisit pada tabel car_images
+            $matched = $this->images->first(function (CarImage $image) use ($colorName) {
+                if (! $image->color_name) {
+                    return false;
+                }
+
+                return strcasecmp($image->color_name, $colorName) === 0
+                    || str_contains(mb_strtolower($image->color_name), mb_strtolower($colorName))
+                    || str_contains(mb_strtolower($colorName), mb_strtolower($image->color_name));
+            });
+
+            if ($matched) {
+                return $matched;
+            }
+
+            // 2. Cari berdasarkan indeks urutan di color_palette / colorSwatches
+            $swatches = $this->colorSwatches();
+            foreach ($swatches as $sIndex => $swatch) {
+                $swatchName = (string) ($swatch['name'] ?? '');
+                if ($swatchName !== '' && (
+                    strcasecmp($swatchName, $colorName) === 0
+                    || str_contains(mb_strtolower($swatchName), mb_strtolower($colorName))
+                    || str_contains(mb_strtolower($colorName), mb_strtolower($swatchName))
+                )) {
+                    $imageAtIndex = $this->images->values()->get($sIndex);
+                    if ($imageAtIndex) {
+                        return $imageAtIndex;
+                    }
+                    break;
+                }
+            }
+        }
+
+        return $this->primaryImage ?? $this->images->first();
     }
 }

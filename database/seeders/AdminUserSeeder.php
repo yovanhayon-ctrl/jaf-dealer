@@ -32,6 +32,7 @@ class AdminUserSeeder extends Seeder
             }
 
             $this->command?->info("Akun {$email} sudah ada (role {$user->roleLabel()}).");
+            $this->seedStaff();
 
             return;
         }
@@ -46,5 +47,24 @@ class AdminUserSeeder extends Seeder
         $user->save();
 
         $this->command?->info("Akun admin {$email} berhasil dibuat.");
+        $this->seedStaff();
+    }
+
+    private function seedStaff(): void
+    {
+        if (app()->environment('local', 'testing')) {
+            $sales2 = User::firstOrCreate(
+                ['email' => 'sales2@gmail.com'],
+                [
+                    'name' => 'Sales 2',
+                    'password' => 'password',
+                    'email_verified_at' => now(),
+                ]
+            );
+            if ($sales2->role !== User::ROLE_SALES) {
+                $sales2->role = User::ROLE_SALES;
+                $sales2->save();
+            }
+        }
     }
 }

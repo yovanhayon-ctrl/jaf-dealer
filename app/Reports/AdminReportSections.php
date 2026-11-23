@@ -114,8 +114,20 @@ class AdminReportSections
                 $m->avg_rating !== null ? number_format($m->avg_rating, 1, ',', '.') : '-',
             ]))->values()->all());
 
+        $topParts = $this->report->topSpareParts();
+        if ($canSeeRevenue) {
+            $sections[] = self::section('Suku Cadang Terpopuler di Bengkel', ['Suku Cadang', 'Nomor SKU', 'Unit Terpakai', 'Nilai (Rp)'], ['text', 'text', 'number', 'rupiah'],
+                $topParts->map(fn ($p) => self::row([$p->part_name, $p->part_number, $p->units, $p->value]))->values()->all());
+        } else {
+            $sections[] = self::section('Suku Cadang Terpopuler di Bengkel', ['Suku Cadang', 'Nomor SKU', 'Unit Terpakai'], ['text', 'text', 'number'],
+                $topParts->map(fn ($p) => self::row([$p->part_name, $p->part_number, $p->units]))->values()->all());
+        }
+
         $sections[] = self::section('Stok Menipis (mobil aktif, stok maksimal '.Car::LOW_STOCK_THRESHOLD.')', ['Mobil', 'Kondisi', 'Stok'], ['text', 'text', 'number'],
             $this->report->lowStockCars()->map(fn ($car) => self::row(["{$car->brand->name} {$car->name} {$car->year}", $car->condition_label, $car->stock]))->values()->all());
+
+        $sections[] = self::section('Suku Cadang Stok Menipis (suku cadang aktif, stok <= batas minimum)', ['Suku Cadang', 'Nomor SKU', 'Kategori', 'Sisa Stok', 'Batas Min'], ['text', 'text', 'text', 'text', 'text'],
+            $this->report->lowStockSpareParts()->map(fn ($part) => self::row([$part->name, $part->part_number, $part->categoryLabel(), $part->stock.' '.$part->unit, $part->min_stock.' '.$part->unit]))->values()->all());
 
         return $sections;
     }

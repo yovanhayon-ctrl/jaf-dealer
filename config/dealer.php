@@ -69,6 +69,7 @@ return [
         'lead' => 'Lihat stok, hitung cicilan, dan jadwalkan test drive langsung dari sini.',
         'background' => 'video',
         'image' => null,
+        'showcase_video' => null,
     ],
 
     'about_text' => null,

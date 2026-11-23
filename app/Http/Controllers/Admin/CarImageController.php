@@ -8,6 +8,7 @@ use App\Models\Car;
 use App\Models\CarImage;
 use App\Support\CarImageProcessor;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -92,6 +93,123 @@ class CarImageController extends Controller
         return $this->backToGallery($car)->with('success', 'Gambar utama berhasil diubah.');
     }
 
+    public function updateColor(Request $request, Car $car, CarImage $image): RedirectResponse
+    {
+        $colorValue = (string) $request->input('color');
+
+        if ($colorValue !== '' && str_contains($colorValue, '|')) {
+            [$name, $hex] = explode('|', $colorValue, 2);
+        } else {
+            $name = $request->input('color_name');
+            $hex = $request->input('color_hex');
+        }
+
+        $name = $name ? trim((string) $name) : null;
+        $hex = $hex ? trim((string) $hex) : null;
+
+        $image->update([
+            'color_name' => $name,
+            'color_hex' => $hex,
+        ]);
+
+        return $this->backToGallery($car)->with('success', 'Warna gambar berhasil disimpan.');
+    }
+
+    public function storeColorPalette(Request $request, Car $car): RedirectResponse
+    {
+        if ($request->has('extra_price') && is_string($request->input('extra_price'))) {
+            $cleaned = preg_replace('/\D/', '', $request->input('extra_price'));
+            $request->merge(['extra_price' => $cleaned !== '' ? (int) $cleaned : null]);
+        }
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:100'],
+            'hex' => ['required', 'string', 'regex:/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/'],
+            'stock' => ['nullable', 'integer', 'min:0', 'max:9999'],
+            'extra_price' => ['nullable', 'integer', 'min:0', 'max:1000000000'],
+        ], [
+            'name.required' => 'Nama warna wajib diisi.',
+            'hex.required' => 'Kode warna (HEX) wajib diisi.',
+            'hex.regex' => 'Format kode warna harus diawali # (contoh: #EAB308).',
+            'stock.integer' => 'Stok harus berupa bilangan bulat.',
+            'stock.min' => 'Stok minimal 0.',
+            'extra_price.integer' => 'Biaya tambahan cat harus berupa angka.',
+            'extra_price.min' => 'Biaya tambahan cat minimal Rp 0.',
+        ]);
+
+        $swatches = $car->colorSwatches();
+        $name = trim($validated['name']);
+        $hex = strtoupper(trim($validated['hex']));
+        $stock = isset($validated['stock']) ? max(0, (int) $validated['stock']) : 1;
+        $extraPrice = isset($validated['extra_price']) ? max(0, (int) $validated['extra_price']) : 0;
+
+        $swatches[] = [
+            'name' => $name,
+            'hex' => $hex,
+            'stock' => $stock,
+            'extra_price' => $extraPrice,
+        ];
+
+        $totalStock = array_sum(array_map(fn ($s) => (int) ($s['stock'] ?? 0), $swatches));
+        $car->update([
+            'color_palette' => array_values($swatches),
+            'stock' => $totalStock,
+        ]);
+
+        return $this->backToGallery($car)->with('success', "Warna {$name} ({$hex}) dengan stok {$stock} unit berhasil ditambahkan ke mobil.");
+    }
+
+    public function updateColorPaletteStock(Request $request, Car $car): RedirectResponse
+    {
+        $stocks = (array) $request->input('stocks', []);
+        $extraPrices = (array) $request->input('extra_prices', []);
+        $swatches = array_values($car->colorSwatches());
+
+        foreach ($swatches as $idx => &$swatch) {
+            if (array_key_exists($idx, $stocks)) {
+                $val = $stocks[$idx];
+                $swatch['stock'] = ($val !== null && $val !== '') ? max(0, (int) $val) : 0;
+            }
+            if (array_key_exists($idx, $extraPrices)) {
+                $val = $extraPrices[$idx];
+                if (is_string($val)) {
+                    $val = preg_replace('/\D/', '', $val);
+                }
+                $swatch['extra_price'] = ($val !== null && $val !== '') ? max(0, (int) $val) : 0;
+            }
+        }
+        unset($swatch);
+
+        $totalStock = array_sum(array_map(fn ($s) => (int) ($s['stock'] ?? 0), $swatches));
+        $car->update([
+            'color_palette' => $swatches,
+            'stock' => $totalStock,
+        ]);
+
+        return $this->backToGallery($car)->with('success', "Stok & harga varian warna berhasil diperbarui (Total stok: {$totalStock} unit).");
+    }
+
+    public function destroyColorPalette(Car $car, int $index): RedirectResponse
+    {
+        $swatches = array_values($car->colorSwatches());
+
+        if (isset($swatches[$index])) {
+            $deletedName = $swatches[$index]['name'];
+            unset($swatches[$index]);
+            $swatches = array_values($swatches);
+            $totalStock = array_sum(array_map(fn ($s) => (int) ($s['stock'] ?? 0), $swatches));
+
+            $car->update([
+                'color_palette' => $swatches,
+                'stock' => $totalStock,
+            ]);
+
+            return $this->backToGallery($car)->with('success', "Warna {$deletedName} berhasil dihapus dari mobil.");
+        }
+
+        return $this->backToGallery($car)->with('warning', 'Warna tidak ditemukan.');
+    }
+
     public function move(Car $car, CarImage $image, string $direction): RedirectResponse
     {
         $ids = $this->orderedImageIds($car);
@@ -119,13 +237,38 @@ class CarImageController extends Controller
 
     public function destroy(Car $car, CarImage $image): RedirectResponse
     {
-        DB::transaction(function () use ($car, $image) {
+        $colorName = $image->color_name;
+        $colorRemoved = false;
+
+        DB::transaction(function () use ($car, $image, $colorName, &$colorRemoved) {
             $image->delete();
 
             $nextId = $this->orderedImageIds($car)->first();
 
             if ($image->is_primary && $nextId !== null) {
                 CarImage::whereKey($nextId)->update(['is_primary' => true]);
+            }
+
+            // Jika gambar terhubung ke suatu warna dan tidak ada gambar lain yang memakai warna tersebut,
+            // otomatis hapus warna tersebut dari daftar color_palette mobil dan sinkronkan total stok.
+            if ($colorName && ! empty($car->color_palette) && is_array($car->color_palette)) {
+                $stillUsed = CarImage::where('car_id', $car->id)
+                    ->where('color_name', $colorName)
+                    ->exists();
+
+                if (! $stillUsed) {
+                    $palette = array_values(array_filter(
+                        $car->color_palette,
+                        fn ($item) => strcasecmp((string) ($item['name'] ?? ''), $colorName) !== 0
+                    ));
+
+                    $totalStock = max(0, array_sum(array_map(fn ($i) => (int) ($i['stock'] ?? 0), $palette)));
+                    $car->update([
+                        'color_palette' => $palette,
+                        'stock' => $totalStock,
+                    ]);
+                    $colorRemoved = true;
+                }
             }
         });
 
@@ -135,6 +278,10 @@ class CarImageController extends Controller
         $message = $image->is_primary && $car->images()->exists()
             ? 'Gambar berhasil dihapus. Gambar berikutnya dijadikan gambar utama.'
             : 'Gambar berhasil dihapus.';
+
+        if ($colorRemoved) {
+            $message .= " Pilihan warna '{$colorName}' otomatis dihapus dari daftar varian warna.";
+        }
 
         return $this->backToGallery($car)->with('success', $message);
     }

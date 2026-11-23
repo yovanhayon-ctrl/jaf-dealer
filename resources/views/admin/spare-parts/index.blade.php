@@ -125,7 +125,7 @@
                                 <td>
                                     <div class="d-flex align-items-center gap-2">
                                         @if ($part->image)
-                                            <img src="{{ $part->imageUrl() }}" alt="" width="40" height="40" class="rounded border object-fit-cover flex-shrink-0">
+                                            <img src="{{ $part->imageUrl() }}" alt="" width="40" height="40" class="rounded border object-fit-contain bg-white p-1 flex-shrink-0" referrerpolicy="no-referrer">
                                         @else
                                             <div class="rounded border bg-light d-flex align-items-center justify-content-center text-muted flex-shrink-0" style="width: 40px; height: 40px;">
                                                 <i class="bi bi-box-seam"></i>

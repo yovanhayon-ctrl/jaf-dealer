@@ -10,8 +10,10 @@ use App\Models\PurchaseRequest;
 use App\Notifications\Notifier;
 use App\Notifications\PaymentProofReviewed;
 use App\Support\PaymentProofFile;
+use DomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -66,19 +68,36 @@ class PaymentProofController extends Controller
     {
         $redirect = $this->backToProofs($purchaseRequest);
 
-        if (! $paymentProof->isPending()) {
-            return $redirect->with('status', "Bukti pembayaran ini sudah {$this->decidedLabel($paymentProof)}.");
+        try {
+            DB::transaction(function () use ($purchaseRequest, $paymentProof) {
+                $lockedPurchase = PurchaseRequest::whereKey($purchaseRequest->id)->lockForUpdate()->firstOrFail();
+                $lockedProof = PaymentProof::whereKey($paymentProof->id)->lockForUpdate()->firstOrFail();
+
+                if (! $lockedProof->isPending()) {
+                    throw new DomainException("Bukti pembayaran ini sudah {$this->decidedLabel($lockedProof)}.");
+                }
+
+                // Total yang diterima tidak boleh melebihi tagihan (mis. bukti pelunasan terkirim dua kali).
+                if ($lockedProof->amount > $lockedPurchase->remainingPayment()) {
+                    throw new DomainException('Bukti tidak bisa diterima: total pembayaran akan melebihi Rp '
+                        .number_format($lockedPurchase->amountPayableToDealer(), 0, ',', '.')
+                        .' (sisa Rp '.number_format($lockedPurchase->remainingPayment(), 0, ',', '.').'). Periksa lagi atau tolak bukti ini.');
+                }
+
+                $lockedProof->update(['status' => PaymentProof::STATUS_APPROVED, 'admin_note' => null, 'verified_at' => now()]);
+            });
+        } catch (DomainException $e) {
+            $purchaseRequest->load('paymentProofs');
+            $paymentProof->refresh();
+
+            return ! $paymentProof->isPending()
+                ? $redirect->with('status', $e->getMessage())
+                : $redirect->with('error', $e->getMessage());
         }
 
-        // Total yang diterima tidak boleh melebihi tagihan (mis. bukti pelunasan terkirim dua kali).
-        if ($paymentProof->amount > $purchaseRequest->remainingPayment()) {
-            return $redirect->with('error', 'Bukti tidak bisa diterima: total pembayaran akan melebihi Rp '
-                .number_format($purchaseRequest->amountPayableToDealer(), 0, ',', '.')
-                .' (sisa Rp '.number_format($purchaseRequest->remainingPayment(), 0, ',', '.').'). Periksa lagi atau tolak bukti ini.');
-        }
-
-        $paymentProof->update(['status' => PaymentProof::STATUS_APPROVED, 'admin_note' => null, 'verified_at' => now()]);
         $purchaseRequest->load('paymentProofs');
+        $paymentProof->refresh();
+
         $this->notifyCustomer($paymentProof, $purchaseRequest);
         ActivityLog::record(ActivityLog::CATEGORY_FINANCE, 'payment.approved',
             "Menerima bukti {$paymentProof->typeLabel()} ".ActivityLog::rupiah($paymentProof->amount).", pengajuan {$purchaseRequest->documentNumber()}",
@@ -99,15 +118,27 @@ class PaymentProofController extends Controller
 
         $redirect = $this->backToProofs($purchaseRequest);
 
-        if (! $paymentProof->isPending()) {
+        $alreadyDecided = DB::transaction(function () use ($paymentProof, $validated) {
+            $lockedProof = PaymentProof::whereKey($paymentProof->id)->lockForUpdate()->firstOrFail();
+
+            if (! $lockedProof->isPending()) {
+                return true;
+            }
+
+            $lockedProof->update([
+                'status' => PaymentProof::STATUS_REJECTED,
+                'admin_note' => $validated['admin_note'],
+                'verified_at' => now(),
+            ]);
+
+            return false;
+        });
+
+        if ($alreadyDecided) {
             return $redirect->with('status', "Bukti pembayaran ini sudah {$this->decidedLabel($paymentProof)}.");
         }
 
-        $paymentProof->update([
-            'status' => PaymentProof::STATUS_REJECTED,
-            'admin_note' => $validated['admin_note'],
-            'verified_at' => now(),
-        ]);
+        $paymentProof->refresh();
         $this->notifyCustomer($paymentProof, $purchaseRequest);
         ActivityLog::record(ActivityLog::CATEGORY_FINANCE, 'payment.rejected',
             "Menolak bukti {$paymentProof->typeLabel()} ".ActivityLog::rupiah($paymentProof->amount).", pengajuan {$purchaseRequest->documentNumber()}: {$validated['admin_note']}",

@@ -59,8 +59,10 @@
                         <dt>Nomor HP</dt>
                         <dd>
                             <a href="tel:{{ $testDrive->phone }}">{{ $testDrive->phone }}</a>
-                            <a href="https://wa.me/{{ preg_replace('/^0/', '62', preg_replace('/\D/', '', $testDrive->phone)) }}" target="_blank" rel="noopener"
-                               class="btn btn-sm btn-outline-success py-0 ms-2"><i class="bi bi-whatsapp"></i>WhatsApp</a>
+                            @if ($waUrl = $testDrive->whatsappContactUrl(auth()->user()))
+                                <a href="{{ $waUrl }}" target="_blank" rel="noopener"
+                                   class="btn btn-sm btn-outline-success py-0 ms-2"><i class="bi bi-whatsapp"></i>WhatsApp</a>
+                            @endif
                         </dd>
 
                         <dt>Sales Penanggung Jawab</dt>
@@ -120,9 +122,8 @@
                                 ->mapWithKeys(fn ($status) => [$status => \App\Models\TestDrive::STATUS_LABELS[$status]])
                                 ->all(),
                             'adminNote' => $testDrive->admin_note,
-                            // Tidak datang: catatan untuk customer terisi otomatis.
-                            'noteTemplates' => [\App\Models\TestDrive::STATUS_NO_SHOW => $testDrive->noShowNote()],
-                            'noteHelp' => 'Wajib diisi saat membatalkan (alasan untuk customer). Maksimal 1000 karakter.',
+                            'noteTemplates' => $testDrive->noteTemplates(),
+                            'noteHelp' => 'Wajib diisi saat membatalkan (alasan untuk customer). Catatan terisi otomatis saat status dipilih dan bisa diubah. Maksimal 1000 karakter.',
                         ])
                         @endcannot
                     </div>

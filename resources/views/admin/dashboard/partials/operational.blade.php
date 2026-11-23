@@ -9,6 +9,7 @@
         [$stats['overdue_test_drives'], 'test drive lewat jadwal', 'admin.test-drives.index', ['jadwal' => 'lewat'], 'test-drives.manage'],
         [$stats['overdue_service_bookings'], 'booking servis lewat jadwal', 'admin.service-bookings.index', ['jadwal' => 'lewat'], 'service-bookings.manage'],
         [$stats['pending_refunds'], 'pengajuan batal, dana belum dikembalikan', 'admin.purchase-requests.index', ['pembayaran' => 'dana-belum-dikembalikan'], 'payments.manage'],
+        [$stats['low_stock_spare_parts'], 'suku cadang stok menipis / perlu restock', 'admin.spare-parts.index', ['stok' => 'menipis'], 'spare-parts.view'],
     ], fn (array $item) => $item[0] > 0 && auth()->user()->can($item[4]));
 @endphp
 
@@ -45,6 +46,15 @@
         @can('service-bookings.manage')
             <x-stat-card label="Servis Pending" :value="$stats['pending_service_bookings']" icon="bi-wrench-adjustable" color="yellow" alert
                          :href="$routeOrNull('admin.service-bookings.index', ['status' => 'pending'])" />
+        @endcan
+        @can('spare-parts.view')
+            @if ($stats['low_stock_spare_parts'] > 0)
+                <x-stat-card label="Suku Cadang Menipis" :value="$stats['low_stock_spare_parts']" icon="bi-exclamation-diamond" color="red" alert
+                             :href="$routeOrNull('admin.spare-parts.index', ['stok' => 'menipis'])" />
+            @else
+                <x-stat-card label="Suku Cadang" :value="$stats['active_spare_parts']" icon="bi-tools" color="navy"
+                             :href="$routeOrNull('admin.spare-parts.index')" />
+            @endif
         @endcan
         @can('users.view')
             <x-stat-card label="Customer" :value="$stats['customers']" icon="bi-people" color="navy"
@@ -210,3 +220,6 @@
         @endcan
     </div>
 </section>
+
+{{-- Widget Performa Tim: Sales & Mekanik Terbaik --}}
+@include('admin.dashboard.partials.team-performance', ['showRevenue' => false])

@@ -94,7 +94,7 @@ class CarDetailTest extends TestCase
         $this->actingAs(User::factory()->admin()->create())->get(route('cars.show', $car))->assertNotFound();
     }
 
-    public function test_galeri_gambar_utama_dulu_dan_thumbnail_lazy(): void
+    public function test_galeri_gambar_fade_dan_color_swatches(): void
     {
         $car = $this->car();
         $this->image($car, 'depan.jpg', 1);
@@ -103,15 +103,18 @@ class CarDetailTest extends TestCase
 
         $this->detail($car)
             ->assertSee('id="carGallery"', false)
-            ->assertSeeInOrder(['utama.jpg', 'depan.jpg', 'belakang.jpg'])
+            ->assertSee('carousel-fade')
+            ->assertSeeInOrder(['depan.jpg', 'utama.jpg', 'belakang.jpg'])
             ->assertSeeInOrder([
-                'alt="Toyota Avanza 2025, foto 1 dari 3"', 'loading="eager"',
-                'alt="Toyota Avanza 2025, foto 2 dari 3"', 'loading="lazy"',
+                'alt="Toyota Avanza 2025, foto 1 dari 3"', 'loading="lazy"',
+                'alt="Toyota Avanza 2025, foto 2 dari 3"', 'loading="eager"',
             ], false)
-            ->assertSee('data-bs-slide-to="2"', false)
-            ->assertSee('aria-label="Tampilkan foto 3"', false)
-            ->assertSee('<img src="'.$car->images()->first()->url.'" alt="" loading="lazy">', false)
-            ->assertSee('Foto berikutnya');
+            ->assertDontSee('Foto berikutnya')
+            ->assertDontSee('carousel-control-prev')
+            ->assertDontSee('carousel-control-next')
+            ->assertDontSee('car-gallery-thumbs')
+            ->assertSee('id="carColorPicker"', false)
+            ->assertSee('id="selectedColorName"', false);
     }
 
     public function test_satu_gambar_tanpa_tombol_geser_dan_thumbnail(): void
@@ -122,7 +125,80 @@ class CarDetailTest extends TestCase
         $this->detail($car)
             ->assertSee('utama.jpg')
             ->assertDontSee('Foto berikutnya')
+            ->assertDontSee('carousel-control-prev')
+            ->assertDontSee('carousel-control-next')
             ->assertDontSee('car-gallery-thumbs');
+    }
+
+    public function test_color_swatches_mapping_nissan_empat_warna(): void
+    {
+        $car = $this->car('Nissan', 'SUV', 'X-Trail 2.5 CVT (T32)', ['year' => 2015]);
+
+        $this->image($car, 'foto1.jpg', 1, primary: true);
+        $this->image($car, 'foto2.jpg', 2);
+        $this->image($car, 'foto3.jpg', 3);
+        $this->image($car, 'foto4.jpg', 4);
+
+        $this->detail($car)
+            ->assertSee('carousel-fade')
+            ->assertDontSee('Foto berikutnya')
+            ->assertDontSee('car-gallery-thumbs')
+            ->assertSee('id="carColorPicker"', false)
+            ->assertSee('Putih Mutiara (Pearl White)')
+            ->assertSee('Hitam Metalik (Diamond Black)')
+            ->assertSee('Perak Metalik (Brilliant Silver)')
+            ->assertSee('Abu-abu Tua Metalik (Smokey Grey Metallic)')
+            ->assertSee('#F4F6F9')
+            ->assertSee('#1A1A1A')
+            ->assertSee('#C0C5CE')
+            ->assertSee('#4A4E54')
+            ->assertSee('id="specCarColor"', false);
+    }
+
+    public function test_color_swatches_memetakan_ke_foto_yang_diberi_warna_eksplisit(): void
+    {
+        $car = $this->car('Nissan', 'SUV', 'X-Trail 2.5 CVT (T32)', ['year' => 2015]);
+
+        // Foto 1 adalah Abu-abu (dan dijadikan utama), Foto 4 adalah Putih
+        $car->images()->create([
+            'path' => 'cars/'.$car->id.'/abu.jpg',
+            'thumb_path' => 'cars/'.$car->id.'/abu_thumb.jpg',
+            'sort_order' => 1,
+            'is_primary' => true,
+            'color_name' => 'Abu-abu Tua Metalik (Smokey Grey Metallic)',
+            'color_hex' => '#4A4E54',
+        ]);
+        $car->images()->create([
+            'path' => 'cars/'.$car->id.'/hitam.jpg',
+            'thumb_path' => 'cars/'.$car->id.'/hitam_thumb.jpg',
+            'sort_order' => 2,
+            'is_primary' => false,
+            'color_name' => 'Hitam Metalik (Diamond Black)',
+            'color_hex' => '#1A1A1A',
+        ]);
+        $car->images()->create([
+            'path' => 'cars/'.$car->id.'/perak.jpg',
+            'thumb_path' => 'cars/'.$car->id.'/perak_thumb.jpg',
+            'sort_order' => 3,
+            'is_primary' => false,
+            'color_name' => 'Perak Metalik (Brilliant Silver)',
+            'color_hex' => '#C0C5CE',
+        ]);
+        $car->images()->create([
+            'path' => 'cars/'.$car->id.'/putih.jpg',
+            'thumb_path' => 'cars/'.$car->id.'/putih_thumb.jpg',
+            'sort_order' => 4,
+            'is_primary' => false,
+            'color_name' => 'Putih Mutiara (Pearl White)',
+            'color_hex' => '#F4F6F9',
+        ]);
+
+        $this->detail($car)
+            ->assertSee('selectedColorName">Abu-abu Tua Metalik (Smokey Grey Metallic)</span>', false)
+            ->assertSee('data-image-index="3"', false)
+            ->assertSee('data-color-name="Putih Mutiara (Pearl White)"', false)
+            ->assertSee('data-image-index="0"', false)
+            ->assertSee('data-color-name="Abu-abu Tua Metalik (Smokey Grey Metallic)"', false);
     }
 
     public function test_placeholder_saat_tanpa_gambar(): void
@@ -252,7 +328,7 @@ class CarDetailTest extends TestCase
             ->assertSee('Hitung simulasi sendiri')
             ->assertSee('href="'.route('credit.index', ['mobil' => $car->slug]).'"', false)
             ->assertSee('Ajukan Pembelian')
-            ->assertSee('href="'.route('purchase-requests.create', $car).'"', false);
+            ->assertSee(route('purchase-requests.create', $car), false);
     }
 
     public function test_tombol_booking_test_drive_menaut_ke_form(): void

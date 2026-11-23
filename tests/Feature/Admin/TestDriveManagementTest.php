@@ -203,7 +203,8 @@ class TestDriveManagementTest extends TestCase
 
         $testDrive->refresh();
         $this->assertSame($to, $testDrive->status);
-        $this->assertSame($note ?: null, $testDrive->admin_note);
+        $expectedNote = $note !== '' ? $note : (TestDrive::NOTE_TEMPLATES[$to] ?? null);
+        $this->assertSame($expectedNote, $testDrive->admin_note);
     }
 
     /**
@@ -433,5 +434,49 @@ class TestDriveManagementTest extends TestCase
         $this->app->make(TestDriveSeeder::class)->run();
 
         $this->assertSame(0, TestDrive::count());
+    }
+
+    public function test_catatan_otomatis_dipasang_bila_admin_mengosongkan(): void
+    {
+        $testDrive = $this->makeTestDrive(['status' => 'pending']);
+
+        $this->changeStatus($testDrive, ['status' => 'confirmed', 'admin_note' => ''])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('confirmed', $testDrive->fresh()->status);
+        $this->assertSame(TestDrive::NOTE_TEMPLATES['confirmed'], $testDrive->fresh()->admin_note);
+    }
+
+    public function test_catatan_otomatis_dengan_tanda_alasan_wajib_dilengkapi(): void
+    {
+        $testDrive = $this->makeTestDrive(['status' => 'pending']);
+
+        $this->changeStatus($testDrive, ['status' => 'cancelled', 'admin_note' => TestDrive::NOTE_TEMPLATES['cancelled']])
+            ->assertSessionHasErrors(['admin_note' => 'Lengkapi catatan admin: ganti tanda … dengan alasan untuk customer.']);
+        $this->assertSame('pending', $testDrive->fresh()->status);
+
+        $this->changeStatus($testDrive, ['status' => 'cancelled', 'admin_note' => 'Mohon maaf, jadwal test drive dibatalkan karena unit sedang diperbaiki.'])
+            ->assertSessionHasNoErrors();
+        $this->assertSame('cancelled', $testDrive->fresh()->status);
+    }
+
+    public function test_form_status_membawa_catatan_otomatis(): void
+    {
+        $testDrive = $this->makeTestDrive(['status' => 'pending']);
+
+        $this->actingAs($this->admin)->get(route('admin.test-drives.show', $testDrive))
+            ->assertSee('data-note-templates=\''.json_encode($testDrive->noteTemplates()).'\'', false);
+    }
+
+    public function test_detail_menampilkan_tombol_whatsapp_dengan_pesan_otomatis(): void
+    {
+        $testDrive = $this->makeTestDrive(['phone' => '081234567890']);
+
+        $response = $this->actingAs($this->admin)->get(route('admin.test-drives.show', $testDrive))
+            ->assertOk();
+
+        $expectedUrl = $testDrive->whatsappContactUrl($this->admin);
+        $this->assertNotNull($expectedUrl);
+        $response->assertSee(e($expectedUrl), false);
     }
 }

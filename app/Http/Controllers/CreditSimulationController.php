@@ -33,9 +33,37 @@ class CreditSimulationController extends Controller
         $cars = $this->cars();
         $slug = $this->text($request, 'mobil');
         $car = $slug !== null ? $cars->firstWhere('slug', $slug) : null;
+        $color = $this->text($request, 'warna');
         $errors = new MessageBag;
 
-        $price = $car?->finalPrice() ?? $this->digits($request, 'harga', $errors, 'Harga');
+        // Tentukan warna yang terpilih jika mobil dipilih
+        $selectedColor = null;
+        $colorOptions = [];
+        if ($car !== null) {
+            $swatches = $car->colorSwatches();
+            if (! empty($swatches)) {
+                $colorOptions = array_map(fn ($s) => [
+                    'name' => $s['name'],
+                    'hex' => $s['hex'],
+                    'extra_price' => (int) ($s['extra_price'] ?? 0),
+                    'price' => $car->finalPriceForColor($s['name']),
+                    'stock' => (int) ($s['stock'] ?? 1),
+                ], $swatches);
+
+                if ($color !== null && collect($colorOptions)->contains('name', $color)) {
+                    $selectedColor = $color;
+                } else {
+                    $primaryColor = $car->primaryImage?->color_name;
+                    $selectedColor = ($primaryColor && collect($colorOptions)->contains('name', $primaryColor))
+                        ? $primaryColor
+                        : ($colorOptions[0]['name'] ?? null);
+                }
+            }
+        }
+
+        $price = $car !== null
+            ? $car->finalPriceForColor($selectedColor)
+            : $this->digits($request, 'harga', $errors, 'Harga');
         $tenor = (int) $request->query('tenor');
         $tenor = in_array($tenor, $credit->tenors(), true) ? $tenor : self::DEFAULT_TENOR;
         $downPayment = $this->digits($request, 'dp', $errors, 'Uang muka');
@@ -70,6 +98,8 @@ class CreditSimulationController extends Controller
         return view('pages.credit.index', [
             'cars' => $cars,
             'car' => $car,
+            'selectedColor' => $selectedColor,
+            'colorOptions' => $colorOptions,
             'unknownCar' => $slug !== null && $car === null,
             'price' => $price,
             'downPayment' => $downPayment,
@@ -95,8 +125,12 @@ class CreditSimulationController extends Controller
     {
         return Car::query()
             ->active()
-            ->with(['brand:id,name', 'activePromos:id,car_id,discount_amount'])
-            ->get(['id', 'brand_id', 'name', 'slug', 'year', 'price', 'vehicle_condition', 'stock', 'is_active'])
+            ->with([
+                'brand:id,name',
+                'primaryImage:id,car_id,path,thumb_path,color_name',
+                'activePromos:id,car_id,discount_amount',
+            ])
+            ->get(['id', 'brand_id', 'name', 'slug', 'year', 'price', 'color', 'color_palette', 'vehicle_condition', 'stock', 'is_active'])
             ->sortBy(fn (Car $car) => mb_strtolower("{$car->brand->name} {$car->name} {$car->year}"))
             ->values();
     }

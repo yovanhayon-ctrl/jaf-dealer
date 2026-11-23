@@ -99,13 +99,26 @@ class SparePart extends Model
 
     public function imageUrl(): ?string
     {
-        return $this->image ? Storage::disk('public')->url($this->image) : null;
+        if (! $this->image) {
+            return null;
+        }
+
+        if (str_starts_with($this->image, 'http://') || str_starts_with($this->image, 'https://')) {
+            return $this->image;
+        }
+
+        return Storage::disk('public')->url($this->image);
+    }
+
+    public function isExternalImage(): bool
+    {
+        return (bool) ($this->image && (str_starts_with($this->image, 'http://') || str_starts_with($this->image, 'https://')));
     }
 
     /**
      * Link WhatsApp pemesanan suku cadang dengan format pesan otomatis.
      */
-    public function whatsappOrderUrl(): ?string
+    public function whatsappOrderUrl(?int $qty = 1): ?string
     {
         $number = preg_replace('/\D/', '', (string) config('dealer.whatsapp'));
 
@@ -113,11 +126,18 @@ class SparePart extends Model
             return null;
         }
 
+        $qty = max(1, $qty ?? 1);
+        $totalPrice = $this->price * $qty;
+        $totalFormatted = 'Rp '.number_format($totalPrice, 0, ',', '.');
+        $unitPriceFormatted = $this->formattedPrice();
+
         $dealerName = config('dealer.name') ?: 'JAF Dealer';
         $message = "Halo {$dealerName}, saya ingin memesan suku cadang:\n"
             ."• Part: {$this->name}\n"
-            ."• Kode Part: {$this->part_number}\n"
-            ."• Harga: {$this->formattedPrice()} / {$this->unit}\n\n"
+            ."• Kode SKU: {$this->part_number}\n"
+            ."• Jumlah: {$qty} {$this->unit}\n"
+            ."• Harga Satuan: {$unitPriceFormatted}\n"
+            ."• Estimasi Total: {$totalFormatted}\n\n"
             .'Apakah stok masih tersedia? Link: '.route('spare-parts.show', $this);
 
         return "https://wa.me/{$number}?text=".rawurlencode($message);

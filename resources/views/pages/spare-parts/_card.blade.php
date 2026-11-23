@@ -5,21 +5,21 @@
 @endphp
 
 <article class="card car-card card-hover h-100">
-    <div class="car-card-media">
+    <div class="spare-part-card-media">
         <a href="{{ $detailUrl }}" tabindex="-1" aria-hidden="true">
             @if ($part->image)
-                <img src="{{ $part->imageUrl() }}" alt="{{ $part->name }}" class="car-card-img" loading="lazy">
+                <img src="{{ $part->imageUrl() }}" alt="{{ $part->name }}" class="spare-part-card-img" loading="lazy" referrerpolicy="no-referrer">
             @else
-                <div class="car-card-img car-card-img-empty" role="img" aria-label="Belum ada foto {{ $part->name }}">
+                <div class="spare-part-card-img-empty" role="img" aria-label="Belum ada foto {{ $part->name }}">
                     <i class="bi bi-box-seam"></i>
                 </div>
             @endif
         </a>
 
         <div class="car-card-badges">
-            <span class="badge rounded-pill badge-condition-used">{{ $part->categoryLabel() }}</span>
+            <span class="spare-part-badge-category">{{ $part->categoryLabel() }}</span>
             @if ($part->isOutOfStock())
-                <span class="badge rounded-pill badge-status-red">Stok Habis</span>
+                <span class="badge rounded-pill badge-status-red" style="font-size: 11px; padding: 3px 8px;">Stok Habis</span>
             @endif
         </div>
     </div>
@@ -41,8 +41,18 @@
         @endif
 
         <div class="mt-auto">
-            <div class="price-final mb-1">{{ $part->formattedPrice() }}</div>
-            <p class="small text-muted mb-3">/ {{ $part->unit }} @if (! $part->isOutOfStock()) · <span class="text-success">Stok: {{ $part->stock }}</span>@endif</p>
+            <div class="d-flex align-items-baseline gap-1 mb-1">
+                <span class="price-final">{{ $part->formattedPrice() }}</span>
+                <span class="small text-muted">/ {{ $part->unit }}</span>
+            </div>
+
+            <p class="small text-body mb-3">
+                @if ($part->isOutOfStock())
+                    <span class="text-danger fw-semibold"><i class="bi bi-x-circle me-1"></i>Stok habis</span>
+                @else
+                    <i class="bi bi-box-seam me-1 text-muted"></i>Stok: <span class="fw-semibold">{{ $part->stock }}</span>
+                @endif
+            </p>
 
             <div class="d-flex gap-2">
                 <a href="{{ $detailUrl }}" class="btn btn-outline-primary btn-sm flex-grow-1">Detail</a>

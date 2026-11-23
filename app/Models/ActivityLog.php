@@ -126,6 +126,8 @@ class ActivityLog extends Model
         return match (true) {
             $this->subject instanceof PurchaseRequest => route('admin.purchase-requests.show', $this->subject),
             $this->subject instanceof User => route('admin.users.show', $this->subject),
+            $this->subject instanceof SparePart => route('admin.spare-parts.edit', $this->subject),
+            $this->subject instanceof ServiceBooking => route('admin.service-bookings.show', $this->subject).'#spare-parts',
             default => null,
         };
     }

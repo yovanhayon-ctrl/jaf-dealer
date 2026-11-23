@@ -43,6 +43,7 @@ class SubmitPurchaseRequest
             return PurchaseRequest::create([
                 'user_id' => $user->id,
                 'car_id' => $locked->id,
+                'color' => ($data['color'] ?? null) ?: null,
                 ...$this->priceData($locked, $data),
                 'phone' => $data['phone'],
                 'address' => $data['address'],
@@ -67,13 +68,18 @@ class SubmitPurchaseRequest
             return ['car' => 'Stok mobil ini habis, pengajuan belum bisa dilakukan.'];
         }
 
+        $color = $data['color'] ?? null;
+        if ($color && ! $car->isColorInStock($color)) {
+            return ['color' => "Stok untuk warna \"{$color}\" sedang habis. Silakan pilih warna lain."];
+        }
+
         if ($existing = $this->activeRequest($user, $car)) {
             return ['car' => "Anda sudah punya pengajuan untuk mobil ini ({$existing->statusLabel()}, "
                 .$existing->created_at->translatedFormat('d M Y').'). Lihat Pengajuan Saya.'];
         }
 
         if (($data['payment_method'] ?? null) === PurchaseRequest::PAYMENT_CREDIT) {
-            $price = $car->finalPrice();
+            $price = $car->finalPriceForColor($color);
             $min = $this->credit->minDownPayment($price);
             $max = $this->credit->maxDownPayment($price);
             $downPayment = (int) ($data['down_payment'] ?? 0);
@@ -106,7 +112,8 @@ class SubmitPurchaseRequest
      */
     private function priceData(Car $car, array $data): array
     {
-        $price = $car->finalPrice();
+        $color = $data['color'] ?? null;
+        $price = $car->finalPriceForColor($color);
 
         if ($data['payment_method'] === PurchaseRequest::PAYMENT_CASH) {
             return [

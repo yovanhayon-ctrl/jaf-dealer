@@ -27,12 +27,12 @@
                     <div class="d-flex align-items-center gap-2 gap-sm-3 ms-auto">
                         @if (Route::has($notificationRoute.'.index') && ($panelUser->isMechanic() || $panelUser->hasPermission('notifications.view')))
                             <a href="{{ route($notificationRoute.'.index') }}"
+                               data-notification-bell
+                               data-count="{{ $adminUnreadNotifications }}"
                                @class(['btn btn-sm btn-outline-secondary notification-bell', 'active' => request()->routeIs($notificationRoute.'.*')])
                                aria-label="Notifikasi{{ $adminUnreadNotifications ? ", {$adminUnreadNotifications} belum dibaca" : '' }}">
                                 <i class="bi bi-bell{{ $adminUnreadNotifications ? '-fill' : '' }}"></i>
-                                @if ($adminUnreadNotifications)
-                                    <span class="badge rounded-pill bg-danger" aria-hidden="true">{{ $adminUnreadNotifications > 9 ? '9+' : $adminUnreadNotifications }}</span>
-                                @endif
+                                <span class="badge rounded-pill bg-danger{{ $adminUnreadNotifications ? '' : ' d-none' }}" data-notification-badge aria-hidden="true">{{ $adminUnreadNotifications > 9 ? '9+' : $adminUnreadNotifications }}</span>
                             </a>
                         @endif
                         <a href="{{ route('home') }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary" title="Lihat Website">

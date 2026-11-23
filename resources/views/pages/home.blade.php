@@ -21,6 +21,14 @@
             && ! str_contains($path, '..') && is_file(public_path($path)))
         ->map(fn ($path) => \App\Support\Asset::url(ltrim($path, '/')))
         ->values();
+    // Video showcase 360 (kanan): video kustom di storage disk public atau fallback bawaan di public/videos
+    $customShowcaseVideo = filled($dealer['hero']['showcase_video'] ?? null)
+        ? Storage::disk('public')->url($dealer['hero']['showcase_video'])
+        : null;
+    $defaultShowcaseVideo = is_file(public_path('videos/Nissan_GTR_JAF_Turntable_360_Loop.mp4'))
+        ? \App\Support\Asset::url('videos/Nissan_GTR_JAF_Turntable_360_Loop.mp4')
+        : null;
+    $showcaseVideo = $heroBackground === 'showcase' ? ($customShowcaseVideo ?? $defaultShowcaseVideo) : null;
 @endphp
 
 @section('content')
@@ -30,7 +38,7 @@
         Latar: gambar banner unggahan (semua layar), video (layar lebar), foto mobil unggulan (HP / tanpa video),
         atau gradien + garis livery.
     --}}
-    <section @class(['home-hero', 'has-video' => $heroVideos->isNotEmpty(), 'has-photo' => $heroPhoto, 'has-banner' => $heroBanner]) aria-labelledby="hero-title"
+    <section @class(['home-hero', 'hero-mode-showcase' => (bool) $showcaseVideo, 'has-showcase' => (bool) $showcaseVideo, 'has-video' => $heroVideos->isNotEmpty(), 'has-photo' => $heroPhoto, 'has-banner' => $heroBanner]) aria-labelledby="hero-title"
              @if ($heroPhoto) style="--hero-photo: url('{{ $heroPhoto }}')" @endif>
         @if ($heroVideos->isNotEmpty())
             {{-- Dekoratif: diputar app.js hanya di layar lebar & tanpa "reduce motion"; di HP tidak diunduh. --}}
@@ -39,7 +47,7 @@
         @endif
         <div class="container home-hero-inner">
             <div class="row align-items-end g-4 w-100 mx-0">
-                <div class="col-lg-7 px-0">
+                <div @class([$showcaseVideo ? 'col-lg-5' : 'col-lg-7', 'px-0'])>
                     <p class="hero-kicker">{{ $dealer['hero']['kicker'] ?: ($dealer['tagline'] ?: 'Nissan Heritage & Performance') }}</p>
                     <h1 id="hero-title" class="hero-title">{{ $dealer['hero']['title'] }}</h1>
                     @if (filled($dealer['hero']['lead']))
@@ -57,7 +65,7 @@
                     </div>
                 </div>
 
-                @if ($featuredCar && $heroVideos->isEmpty() && ! $heroBanner)
+                @if ($featuredCar && $heroVideos->isEmpty() && ! $heroBanner && ! $showcaseVideo)
                     @php($featuredTitle = "{$featuredCar->brand->name} {$featuredCar->name} {$featuredCar->year}")
                     {{-- Hanya layar lebar: di HP foto mobil unggulan sudah menjadi latar hero. --}}
                     <div class="col-lg-5 d-none d-lg-block pe-0">
@@ -81,6 +89,16 @@
                 @endif
             </div>
         </div>
+
+        @if ($showcaseVideo)
+            {{-- Showcase 360 Full-Bleed: direct child dari section, absolute di desktop (z-index: 1), relative di HP --}}
+            <div class="hero-showcase-stage" aria-label="Nissan GT-R 360 Showcase">
+                <video class="hero-showcase-video" autoplay loop muted playsinline preload="auto" aria-hidden="true" tabindex="-1">
+                    <source src="{{ $showcaseVideo }}" type="video/mp4">
+                </video>
+                <div class="hero-showcase-fade" aria-hidden="true"></div>
+            </div>
+        @endif
     </section>
 
     @if ($latestCars->isEmpty())
@@ -107,8 +125,8 @@
         </section>
     @endif
 
-    {{-- Mobil unggulan saat hero memakai video (tanpa video, mobil unggulan sudah tampil di hero). --}}
-    @if ($featuredCars->isNotEmpty() && $heroVideos->isNotEmpty())
+    {{-- Mobil unggulan saat hero memakai video/showcase (tanpa video/showcase, mobil unggulan sudah tampil di hero). --}}
+    @if ($featuredCars->isNotEmpty() && ($heroVideos->isNotEmpty() || $showcaseVideo))
         @php($isSlider = $featuredCars->count() > 1)
         <section class="container home-section scroll-showcase" aria-labelledby="showcase-title">
             <div class="scroll-showcase-head text-center mx-auto">

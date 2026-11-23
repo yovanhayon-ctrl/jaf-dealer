@@ -82,7 +82,7 @@ class BookTestDrive
             ->exists();
 
         if ($slotTaken) {
-            return ['preferred_time' => 'Jadwal ini sudah dipesan, silakan pilih jam atau tanggal lain.'];
+            return ['preferred_time' => 'Maaf, unit mobil ini sudah terjadwal untuk Test Drive pada tanggal dan jam tersebut. Silakan pilih jam atau tanggal lain.'];
         }
 
         return [];

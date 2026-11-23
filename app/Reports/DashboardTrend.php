@@ -47,7 +47,7 @@ class DashboardTrend
         $serviceBookings = $this->perMonth('service_bookings')
             ->selectRaw('COUNT(*) AS total')
             ->selectRaw("COUNT(CASE WHEN status = 'completed' THEN 1 END) AS services_completed")
-            ->selectRaw("COALESCE(SUM(CASE WHEN status = 'completed' THEN service_price ELSE 0 END), 0) AS service_revenue")
+            ->selectRaw("COALESCE(SUM(CASE WHEN status = 'completed' THEN service_price + COALESCE((SELECT SUM(subtotal) FROM service_booking_spare_parts WHERE service_booking_spare_parts.service_booking_id = service_bookings.id), 0) ELSE 0 END), 0) AS service_revenue")
             ->get()
             ->keyBy('month');
 

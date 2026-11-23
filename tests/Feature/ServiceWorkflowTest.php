@@ -6,6 +6,7 @@ use App\Models\Service;
 use App\Models\ServiceBooking;
 use App\Models\ServiceBookingTask;
 use App\Models\User;
+use App\Notifications\MechanicJobAssigned;
 use App\Notifications\ServiceBookingStatusChanged;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -148,63 +149,66 @@ class ServiceWorkflowTest extends TestCase
         $this->actingAs($this->admin)->get(route('mechanic.jobs.show', $this->booking))->assertForbidden();
     }
 
-    public function test_alur_mekanik_mulai_centang_dan_selesai(): void
+    public function test_alur_admin_kelola_checklist_dan_mekanik_mendapat_notifikasi_selesai(): void
     {
         Notification::fake();
         $this->assign();
+
+        // Mekanik mencoba aksi ditolak karena dikelola admin
         $this->actingAs($this->mechanic);
-
-        // Centang sebelum mulai ditolak.
         $this->patch(route('mechanic.jobs.tasks.update', [$this->booking, $this->task('Ganti oli mesin')]), ['status' => 'done'])
-            ->assertSessionHas('error');
+            ->assertSessionHas('error', 'Checklist pekerjaan hanya dapat dilakukan oleh Admin.');
+        $this->patch(route('mechanic.jobs.start', $this->booking))
+            ->assertSessionHas('error', 'Status pengerjaan servis dikelola oleh Admin.');
+        $this->patch(route('mechanic.jobs.finish', $this->booking))
+            ->assertSessionHas('error', 'Penyelesaian servis dikelola oleh Admin.');
 
-        $this->patch(route('mechanic.jobs.start', $this->booking))->assertSessionHas('success', 'Servis dimulai. Customer sudah diberi tahu.');
+        // Admin mulai pengerjaan
+        $this->actingAs($this->admin);
+        $this->patch(route('admin.service-bookings.update-status', $this->booking), ['status' => ServiceBooking::STATUS_IN_PROGRESS])
+            ->assertSessionHas('success');
         $this->booking->refresh();
         $this->assertSame(ServiceBooking::STATUS_IN_PROGRESS, $this->booking->status);
         $this->assertNotNull($this->booking->started_at);
 
-        $this->patch(route('mechanic.jobs.tasks.update', [$this->booking, $this->task('Ganti oli mesin')]), ['status' => 'done']);
-        $this->patch(route('mechanic.jobs.tasks.update', [$this->booking, $this->task('Ganti filter oli')]), ['status' => 'skipped'])
-            ->assertSessionHasErrorsIn("task{$this->task('Ganti filter oli')->id}", 'note');
-
-        // Selesai ditolak selama masih ada pekerjaan yang belum ditangani.
-        $this->patch(route('mechanic.jobs.finish', $this->booking))->assertSessionHas('error');
-
-        $this->patch(route('mechanic.jobs.tasks.update', [$this->booking, $this->task('Ganti filter oli')]), [
+        // Admin mencentang checklist
+        $this->patch(route('admin.service-bookings.tasks.update', [$this->booking, $this->task('Ganti oli mesin')]), ['status' => 'done']);
+        $this->patch(route('admin.service-bookings.tasks.update', [$this->booking, $this->task('Ganti filter oli')]), [
             'status' => 'skipped', 'note' => 'Filter oli belum tersedia',
         ]);
-        $this->patch(route('mechanic.jobs.tasks.update', [$this->booking, $this->task('Cek dan setel rem')]), ['status' => 'done']);
-        $this->patch(route('mechanic.jobs.findings', $this->booking), ['findings' => 'Kampas rem depan tinggal 20%, disarankan ganti bulan depan.'])
+        $this->patch(route('admin.service-bookings.tasks.update', [$this->booking, $this->task('Cek dan setel rem')]), ['status' => 'done']);
+        $this->patch(route('admin.service-bookings.findings', $this->booking), ['findings' => 'Kampas rem depan tinggal 20%, disarankan ganti bulan depan.'])
             ->assertSessionHas('success');
 
-        $this->patch(route('mechanic.jobs.finish', $this->booking))->assertSessionHas('success', 'Servis selesai. Customer sudah diberi tahu.');
+        // Admin menyelesaikan servis
+        $this->patch(route('admin.service-bookings.update-status', $this->booking), ['status' => ServiceBooking::STATUS_COMPLETED])
+            ->assertSessionHas('success');
 
         $this->booking->refresh();
         $this->assertSame(ServiceBooking::STATUS_COMPLETED, $this->booking->status);
         $this->assertNotNull($this->booking->finished_at);
         $this->assertSame([3, 3], $this->booking->taskProgress());
         $this->assertSame('Filter oli belum tersedia', $this->task('Ganti filter oli')->note);
-        // Dua perubahan status (Dikerjakan, Selesai); Notifier mengirim database & email terpisah.
-        Notification::assertSentTo($this->customer, ServiceBookingStatusChanged::class,
-            fn ($notification, array $channels) => $channels === ['database']);
-        Notification::assertSentToTimes($this->customer, ServiceBookingStatusChanged::class, 2 * (config('dealer.mail_notifications') ? 2 : 1));
 
-        // Customer melihat mekanik, progres, temuan, dan alasan pekerjaan dilewati.
-        $this->actingAs($this->customer)->get(route('account.service-bookings.index'))
-            ->assertSee('Joko Prasetyo')
-            ->assertSee('3 dari 3 pekerjaan ditangani')
+        // Notifikasi ke customer dan ke mekanik saat selesai
+        Notification::assertSentTo($this->customer, ServiceBookingStatusChanged::class);
+        Notification::assertSentTo($this->mechanic, MechanicJobAssigned::class, function ($notification) {
+            return $notification->toArray($this->mechanic)['title'] === 'Pekerjaan Servis Selesai';
+        });
+
+        // Mekanik dapat melihat daftar pekerjaan & temuan secara read-only
+        $this->actingAs($this->mechanic)->get(route('mechanic.jobs.show', $this->booking))
+            ->assertOk()
+            ->assertSee('Ganti oli mesin')
             ->assertSee('Kampas rem depan tinggal 20%')
-            ->assertSee('Dilewati: Filter oli belum tersedia');
+            ->assertDontSee('form method="POST" action="'.route('mechanic.jobs.start', $this->booking), false);
     }
 
-    public function test_mekanik_tidak_bisa_mulai_sebelum_tanggal_jadwal(): void
+    public function test_aksi_mulai_oleh_mekanik_ditolak(): void
     {
-        $this->booking->update(['preferred_date' => '2026-10-15']);
         $this->assign();
-
         $this->actingAs($this->mechanic)->patch(route('mechanic.jobs.start', $this->booking))
-            ->assertSessionHas('error', 'Servis baru bisa dimulai pada tanggal jadwalnya (15 Okt 2026).');
-        $this->assertSame(ServiceBooking::STATUS_CONFIRMED, $this->booking->fresh()->status);
+            ->assertSessionHas('error', 'Status pengerjaan servis dikelola oleh Admin.');
     }
 
     public function test_status_admin_tetap_mencatat_waktu_dan_memberi_tahu_customer(): void

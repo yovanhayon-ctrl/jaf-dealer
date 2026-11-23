@@ -11,7 +11,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class SparePartController extends Controller
@@ -93,6 +95,8 @@ class SparePartController extends Controller
         $data = $request->validated();
         $imagePath = $this->handleImageUpload($request);
 
+        unset($data['image_url'], $data['remove_image'], $data['save_to_storage']);
+
         $sparePart = SparePart::create([
             ...$data,
             'slug' => SparePart::uniqueSlug($data['name']),
@@ -121,6 +125,8 @@ class SparePartController extends Controller
     {
         $data = $request->validated();
         $imagePath = $this->handleImageUpload($request, $sparePart->image);
+
+        unset($data['image_url'], $data['remove_image'], $data['save_to_storage']);
 
         $sparePart->update([
             ...$data,
@@ -151,7 +157,7 @@ class SparePartController extends Controller
 
     public function destroy(SparePart $sparePart): RedirectResponse
     {
-        if ($sparePart->image) {
+        if ($sparePart->image && ! $sparePart->isExternalImage()) {
             Storage::disk('public')->delete($sparePart->image);
         }
 
@@ -166,8 +172,10 @@ class SparePartController extends Controller
 
     private function handleImageUpload(SparePartRequest $request, ?string $currentImage = null): ?string
     {
+        $isCurrentExternal = $currentImage && (str_starts_with($currentImage, 'http://') || str_starts_with($currentImage, 'https://'));
+
         if ($request->boolean('remove_image')) {
-            if ($currentImage) {
+            if ($currentImage && ! $isCurrentExternal) {
                 Storage::disk('public')->delete($currentImage);
             }
 
@@ -175,7 +183,7 @@ class SparePartController extends Controller
         }
 
         if ($request->hasFile('image')) {
-            if ($currentImage) {
+            if ($currentImage && ! $isCurrentExternal) {
                 Storage::disk('public')->delete($currentImage);
             }
 
@@ -186,6 +194,118 @@ class SparePartController extends Controller
             }
         }
 
+        if ($request->filled('image_url')) {
+            return $this->syncImageFromUrl($request, $currentImage, $isCurrentExternal);
+        }
+
+        if ($isCurrentExternal && $request->has('image_url') && ! $request->filled('image_url')) {
+            return null;
+        }
+
         return $currentImage;
+    }
+
+    /**
+     * Memproses dan menyimpan gambar dari URL eksternal dengan proteksi anti-SSRF.
+     *
+     * @throws ValidationException jika URL mengarah ke jaringan privat/lokal
+     */
+    protected function syncImageFromUrl(SparePartRequest $request, ?string $currentImage = null, bool $isCurrentExternal = false): ?string
+    {
+        $newUrl = trim((string) $request->input('image_url'));
+
+        if (! $this->isSafePublicUrl($newUrl)) {
+            throw ValidationException::withMessages([
+                'image_url' => 'URL gambar tidak valid atau mengarah ke alamat jaringan privat/internal yang tidak diizinkan.',
+            ]);
+        }
+
+        // Unduh & simpan salinan ke storage lokal jika opsi aktif
+        if ($request->boolean('save_to_storage', true)) {
+            try {
+                $response = Http::withHeaders([
+                    'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept' => 'image/*,*/*;q=0.8',
+                ])->timeout(8)->get($newUrl);
+
+                $contentType = (string) $response->header('Content-Type');
+                if ($response->successful() && (str_starts_with($contentType, 'image/') || str_contains($contentType, 'octet-stream'))) {
+                    $tempPath = tempnam(sys_get_temp_dir(), 'sp_img_');
+                    file_put_contents($tempPath, $response->body());
+
+                    try {
+                        $stored = (new CarImageProcessor)->storeSingle($tempPath, 'spare-parts', 800, 800);
+                        @unlink($tempPath);
+
+                        if ($currentImage && $currentImage !== $stored && ! $isCurrentExternal) {
+                            Storage::disk('public')->delete($currentImage);
+                        }
+
+                        return $stored;
+                    } catch (\Throwable) {
+                        @unlink($tempPath);
+                    }
+                }
+            } catch (\Throwable) {
+                // Fallback ke URL eksternal jika gagal mengunduh
+            }
+        }
+
+        if ($currentImage && $currentImage !== $newUrl && ! $isCurrentExternal) {
+            Storage::disk('public')->delete($currentImage);
+        }
+
+        return $newUrl;
+    }
+
+    /**
+     * Memvalidasi bahwa URL aman dari celah Server-Side Request Forgery (SSRF):
+     * - Hanya mengizinkan skema http atau https
+     * - Memblokir IP privat, loopback, dan reserved range (FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)
+     * - Memblokir hostname internal/localhost
+     */
+    public function isSafePublicUrl(string $url): bool
+    {
+        $parsed = parse_url($url);
+        if (! $parsed || empty($parsed['host'])) {
+            return false;
+        }
+
+        $scheme = strtolower($parsed['scheme'] ?? '');
+        if (! in_array($scheme, ['http', 'https'], true)) {
+            return false;
+        }
+
+        $host = strtolower($parsed['host']);
+
+        // Blokir localhost dan domain internal
+        if (in_array($host, ['localhost', 'localhost.localdomain', 'ip6-localhost', 'ip6-loopback'], true)
+            || str_ends_with($host, '.local')
+            || str_ends_with($host, '.internal')
+            || str_ends_with($host, '.lan')) {
+            return false;
+        }
+
+        // Jika host adalah format IP langsung
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            return (bool) filter_var(
+                $host,
+                FILTER_VALIDATE_IP,
+                FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+            );
+        }
+
+        // Resolusi hostname untuk mengecek IP di baliknya (mencegah DNS rebinding & nip.io)
+        $resolvedIp = @gethostbyname($host);
+        if ($resolvedIp && $resolvedIp !== $host) {
+            return (bool) filter_var(
+                $resolvedIp,
+                FILTER_VALIDATE_IP,
+                FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+            );
+        }
+
+        // Jika hostname tidak bisa di-resolve ke IP (misal offline/testing mock)
+        return ! filter_var($host, FILTER_VALIDATE_IP);
     }
 }

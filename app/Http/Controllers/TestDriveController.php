@@ -28,7 +28,7 @@ class TestDriveController extends Controller
         // Label "Merek Nama Tahun"; diurutkan di PHP (satu query + eager load).
         $cars = Car::query()
             ->testDrivable()
-            ->with(['brand:id,name', 'primaryImage:id,car_id,path,thumb_path'])
+            ->with(['brand:id,name', 'category:id,name', 'activePromos', 'primaryImage:id,car_id,path,thumb_path'])
             ->get()
             ->sortBy(fn (Car $car) => mb_strtolower("{$car->brand->name} {$car->name} {$car->year}"))
             ->values();
@@ -40,9 +40,29 @@ class TestDriveController extends Controller
             ? Car::query()->with('brand:id,name')->where('slug', $slug)->first(['id', 'brand_id', 'name', 'year'])
             : null;
 
+        $carsData = $cars->mapWithKeys(fn (Car $car) => [
+            $car->id => [
+                'id' => $car->id,
+                'name' => "{$car->brand->name} {$car->name} {$car->year}",
+                'brand' => $car->brand->name,
+                'year' => $car->year,
+                'price' => 'Rp '.number_format((int) $car->finalPrice(), 0, ',', '.'),
+                'condition' => $car->condition_label,
+                'is_new' => $car->isNew(),
+                'category' => $car->category?->name ?? 'Mobil',
+                'transmission' => $car->transmission_label,
+                'fuel_type' => $car->fuel_type_label,
+                'stock' => $car->stock,
+                'stock_label' => $car->inStock() ? "Stok: {$car->stock} unit" : 'Unit Display (Stok 0)',
+                'image_url' => $car->primaryImage?->thumb_url ?? null,
+                'detail_url' => route('cars.show', $car),
+            ],
+        ]);
+
         return view('pages.test-drives.create', [
             'isAdmin' => false,
             'cars' => $cars,
+            'carsData' => $carsData,
             'selectedCar' => $selectedCar,
             'unavailableCar' => $unavailableCar,
             'firstDate' => TestDriveRequest::firstDate(),

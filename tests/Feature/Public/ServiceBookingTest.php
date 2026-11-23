@@ -155,7 +155,7 @@ class ServiceBookingTest extends TestCase
             ->assertSee('Servis Berkala (mulai Rp 450.000)')
             ->assertDontSee('Layanan Lama')
             ->assertSee('value="081211112222"', false)
-            ->assertSee('min="2026-10-09"', false)
+            ->assertSee('min="2026-10-08"', false)
             ->assertSee('max="2026-11-07"', false);
 
         $this->get(route('service-bookings.create', ['layanan' => $inactive->slug]))
@@ -187,11 +187,15 @@ class ServiceBookingTest extends TestCase
             'model terlalu panjang' => [['vehicle_model' => str_repeat('a', 101)], 'vehicle_model'],
             'plat kosong' => [['plate_number' => ''], 'plate_number'],
             'plat tidak valid' => [['plate_number' => '1234 ABC'], 'plate_number'],
+            'plat tanpa seri' => [['plate_number' => 'B 1234'], 'plate_number'],
+            'plat wilayah terlalu panjang' => [['plate_number' => 'ABC 1234 XY'], 'plate_number'],
             'plat angka terlalu panjang' => [['plate_number' => 'B 12345 A'], 'plate_number'],
             'tahun terlalu lama' => [['vehicle_year' => '1949'], 'vehicle_year'],
             'tahun masa depan' => [['vehicle_year' => '2028'], 'vehicle_year'],
             'km terlalu besar' => [['mileage' => '2.000.001'], 'mileage'],
-            'tanggal hari ini' => [['preferred_date' => '2026-10-08'], 'preferred_date'],
+            'tanggal kemarin' => [['preferred_date' => '2026-10-07'], 'preferred_date'],
+            'tanggal hari ini jam lewat' => [['preferred_date' => '2026-10-08', 'preferred_time' => '09:00'], 'preferred_time'],
+            'tanggal hari ini jam mepet' => [['preferred_date' => '2026-10-08', 'preferred_time' => '10:00'], 'preferred_time'],
             'tanggal lewat 30 hari' => [['preferred_date' => '2026-11-08'], 'preferred_date'],
             'tanggal format salah' => [['preferred_date' => '12/10/2026'], 'preferred_date'],
             'jam di luar slot' => [['preferred_time' => '16:00'], 'preferred_time'],
@@ -232,6 +236,14 @@ class ServiceBookingTest extends TestCase
         $this->assertSame('B 1234 ABC', $booking->plate_number);
         $this->assertSame('081234567890', $booking->phone);
         $this->assertSame(45_000, $booking->mileage);
+    }
+
+    public function test_pesan_validasi_plat_nomor_sesuai_standar(): void
+    {
+        $this->book(['plate_number' => 'B 1234'])
+            ->assertSessionHasErrors([
+                'plate_number' => 'Format plat nomor tidak valid. Gunakan standar Indonesia: 1–2 huruf, 1–4 angka, dan 1–3 huruf (contoh: D 1234 ABC atau AB 2235 WEZ).',
+            ]);
     }
 
     public function test_layanan_nonaktif_ditolak(): void
@@ -354,5 +366,25 @@ class ServiceBookingTest extends TestCase
             ->assertSee('B 1234 ABC')
             ->assertSee('12 Okt 2026')
             ->assertSee('Menunggu');
+    }
+
+    public function test_booking_hari_ini_diterima_jika_jam_memenuhi_jeda_minimal(): void
+    {
+        $this->book(['preferred_date' => '2026-10-08', 'preferred_time' => '11:00'])
+            ->assertSessionHasNoErrors();
+
+        $booking = ServiceBooking::sole();
+        $this->assertSame('2026-10-08', $booking->preferred_date->toDateString());
+        $this->assertSame('11:00', $booking->timeLabel());
+    }
+
+    public function test_booking_hari_ini_ditolak_jika_sudah_melewati_jam_operasional(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-08 16:00:00', 'Asia/Jakarta'));
+
+        $this->book(['preferred_date' => '2026-10-08', 'preferred_time' => '15:00'])
+            ->assertSessionHasErrors([
+                'preferred_date' => 'Pendaftaran servis untuk hari ini telah ditutup. Silakan pilih jadwal mulai besok (09 Okt 2026).',
+            ]);
     }
 }

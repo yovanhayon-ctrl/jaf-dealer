@@ -523,4 +523,16 @@ class PurchaseRequestManagementTest extends TestCase
         $this->assertSame(0, PurchaseRequest::count());
         $this->assertEquals($stock, Car::pluck('stock', 'slug'));
     }
+
+    public function test_detail_menampilkan_tombol_whatsapp_dengan_pesan_otomatis(): void
+    {
+        $purchase = $this->purchase(['phone' => '081234567890']);
+
+        $response = $this->actingAs($this->admin)->get(route('admin.purchase-requests.show', $purchase))
+            ->assertOk();
+
+        $expectedUrl = $purchase->whatsappContactUrl($this->admin);
+        $this->assertNotNull($expectedUrl);
+        $response->assertSee(e($expectedUrl), false);
+    }
 }

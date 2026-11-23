@@ -44,8 +44,9 @@
                     <article class="card test-drive-item account-item" id="pengajuan-{{ $purchase->id }}">
                         <div class="card-body p-3">
                             <div class="account-item-head">
-                                @if ($car->primaryImage)
-                                    <img src="{{ $car->primaryImage->thumb_url }}" alt="{{ $carTitle }}" class="test-drive-car-thumb" loading="lazy">
+                                @php($displayImage = $purchase->carImage() ?? $car->primaryImage)
+                                @if ($displayImage)
+                                    <img src="{{ $displayImage->thumb_url }}" alt="{{ $carTitle }}" class="test-drive-car-thumb" loading="lazy">
                                 @else
                                     <span class="test-drive-car-thumb car-card-img-empty" aria-hidden="true"><i class="bi bi-car-front"></i></span>
                                 @endif
@@ -62,6 +63,9 @@
                                         <x-status-badge :status="$purchase->status" />
                                     </div>
                                     <p class="small mb-0">
+                                        @if ($purchase->color)
+                                            <span class="badge text-bg-light border me-1">{{ $purchase->color }}</span>
+                                        @endif
                                         <span class="fw-semibold">{{ $purchase->paymentMethodLabel() }}</span>,
                                         harga <x-price :amount="$purchase->car_price" />@if ($purchase->isCredit()),
                                             cicilan <span class="fw-semibold"><x-price :amount="$purchase->monthly_installment" />/bulan</span>

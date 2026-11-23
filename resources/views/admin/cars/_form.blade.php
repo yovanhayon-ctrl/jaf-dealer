@@ -75,6 +75,32 @@
             </div>
                 <x-form.textarea name="description" label="Deskripsi" :value="$car->description" rows="5" maxlength="5000" />
         </section>
+
+        <section class="admin-form-section">
+            <h2 class="admin-form-section-title">Legalitas, Dokumen &amp; Jaminan</h2>
+            <div class="row gx-3">
+                <div class="col-md-6">
+                    <x-form.input name="tax_status" label="Status Pajak" :value="$car->tax_status" maxlength="100"
+                                  placeholder="Contoh: Pajak Hidup (s/d 10/2027)" help="Terutama untuk mobil bekas." />
+                </div>
+                <div class="col-md-6">
+                    <x-form.input name="document_status" label="Kelengkapan Dokumen" :value="$car->document_status" maxlength="150"
+                                  placeholder="Contoh: Lengkap (BPKB, STNK, Faktur)" />
+                </div>
+                <div class="col-md-6">
+                    <x-form.input name="ownership_history" label="Riwayat Kepemilikan" :value="$car->ownership_history" maxlength="100"
+                                  placeholder="Contoh: Tangan Pertama dari Baru" />
+                </div>
+                <div class="col-md-6">
+                    <x-form.select name="plate_type" label="Tipe Plat Nomor" :options="['Ganjil' => 'Ganjil', 'Genap' => 'Genap']"
+                                   :value="$car->plate_type" placeholder="Pilih Ganjil/Genap (Opsional)" />
+                </div>
+                <div class="col-12">
+                    <x-form.input name="warranty_info" label="Garansi &amp; Jaminan Dealer" :value="$car->warranty_info" maxlength="255"
+                                  placeholder="Contoh: Garansi Mesin 1 Tahun, Lulus Inspeksi 150 Titik Bebas Banjir &amp; Tabrakan" />
+                </div>
+            </div>
+        </section>
     </div>
 
     <div class="col-xl-4">

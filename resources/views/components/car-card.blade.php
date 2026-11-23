@@ -6,7 +6,8 @@
 
 @php
     $credit = app(\App\Support\CreditCalculator::class);
-    $finalPrice = $car->finalPrice();
+    $primaryColor = $car->primaryImage?->color_name;
+    $finalPrice = $car->finalPriceForColor($primaryColor);
     // Cicilan termurah: DP minimum + tenor terpanjang (hitungan PHP murni, tanpa query).
     $installment = $finalPrice > 0
         ? $credit->calculate($finalPrice, $credit->minDownPayment($finalPrice), max($credit->tenors()))['monthly_installment']

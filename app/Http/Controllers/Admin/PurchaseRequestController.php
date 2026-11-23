@@ -83,8 +83,10 @@ class PurchaseRequestController extends Controller
 
         $purchaseRequest->load([
             'user:id,name,email,phone',
-            'car:id,brand_id,name,slug,year,vehicle_condition,price,stock,is_active',
+            'car:id,brand_id,name,slug,year,vehicle_condition,price,stock,is_active,color_palette',
             'car.brand:id,name',
+            'car.primaryImage:id,car_id,path,thumb_path,color_name',
+            'car.images:id,car_id,path,thumb_path,color_name,sort_order',
             'sales:id,name',
             'paymentProofs.recorder:id,name',
             'paymentRefunds.recorder:id,name',

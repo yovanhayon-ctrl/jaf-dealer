@@ -53,9 +53,12 @@
                     @continue(! Route::has($item['route']))
 
                     @php($isActive = request()->routeIs($item['active']))
-                    <a @class(['nav-link', 'active' => $isActive]) href="{{ route($item['route']) }}" @if ($isActive) aria-current="page" @endif>
+                    @php($isNotificationItem = in_array($item['route'], ['admin.notifications.index', 'mechanic.notifications.index'], true))
+                    <a @class(['nav-link', 'active' => $isActive]) href="{{ route($item['route']) }}" @if ($isActive) aria-current="page" @endif @if ($isNotificationItem) data-notification-sidebar @endif>
                         <i class="bi {{ $item['icon'] }}"></i>{{ $item['label'] }}
-                        @if (! empty($item['badge']))
+                        @if ($isNotificationItem)
+                            <span class="badge rounded-pill bg-danger ms-auto{{ ! empty($item['badge']) ? '' : ' d-none' }}" data-notification-badge>{{ ($item['badge'] ?? 0) > 99 ? '99+' : ($item['badge'] ?? 0) }}<span class="visually-hidden"> belum dibaca</span></span>
+                        @elseif (! empty($item['badge']))
                             <span class="badge rounded-pill bg-danger ms-auto">{{ $item['badge'] > 99 ? '99+' : $item['badge'] }}<span class="visually-hidden"> belum dibaca</span></span>
                         @endif
                     </a>

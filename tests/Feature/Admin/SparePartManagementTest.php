@@ -102,6 +102,134 @@ class SparePartManagementTest extends TestCase
         ]);
     }
 
+    public function test_admin_bisa_menambah_spare_part_dengan_link_url_gambar(): void
+    {
+        $externalUrl = 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?w=600';
+
+        $response = $this->actingAs($this->admin)->post(route('admin.spare-parts.store'), [
+            'part_number' => 'URL-TEST-001',
+            'name' => 'Filter Bensin Google Image',
+            'category' => 'mesin',
+            'price' => '150.000',
+            'stock' => '10',
+            'min_stock' => '3',
+            'unit' => 'pcs',
+            'image_url' => $externalUrl,
+            'is_active' => '1',
+        ]);
+
+        $response->assertRedirect(route('admin.spare-parts.index'));
+
+        $part = SparePart::where('part_number', 'URL-TEST-001')->firstOrFail();
+        $this->assertSame($externalUrl, $part->image);
+        $this->assertSame($externalUrl, $part->imageUrl());
+        $this->assertTrue($part->isExternalImage());
+    }
+
+    public function test_admin_bisa_mengubah_spare_part_dari_file_ke_link_url(): void
+    {
+        Storage::fake('public');
+        $localPath = 'spare-parts/old-image.jpg';
+        Storage::disk('public')->put($localPath, 'dummy image content');
+
+        $part = SparePart::factory()->create([
+            'image' => $localPath,
+        ]);
+
+        $this->assertFalse($part->isExternalImage());
+        Storage::disk('public')->assertExists($localPath);
+
+        $externalUrl = 'https://example.com/cdn/new-part.png';
+
+        $this->actingAs($this->admin)->put(route('admin.spare-parts.update', $part), [
+            'part_number' => $part->part_number,
+            'name' => $part->name,
+            'category' => $part->category,
+            'price' => $part->price,
+            'stock' => $part->stock,
+            'unit' => $part->unit,
+            'image_url' => $externalUrl,
+            'is_active' => '1',
+        ])->assertRedirect(route('admin.spare-parts.index'));
+
+        $part->refresh();
+        $this->assertSame($externalUrl, $part->image);
+        $this->assertTrue($part->isExternalImage());
+        // File lama terhapus dari disk public
+        Storage::disk('public')->assertMissing($localPath);
+    }
+
+    public function test_admin_bisa_mengubah_spare_part_dari_link_ke_file_upload(): void
+    {
+        Storage::fake('public');
+        $externalUrl = 'https://example.com/cdn/part.png';
+
+        $part = SparePart::factory()->create([
+            'image' => $externalUrl,
+        ]);
+
+        $this->assertTrue($part->isExternalImage());
+
+        $newFile = UploadedFile::fake()->image('new-local.webp', 400, 400);
+
+        $this->actingAs($this->admin)->put(route('admin.spare-parts.update', $part), [
+            'part_number' => $part->part_number,
+            'name' => $part->name,
+            'category' => $part->category,
+            'price' => $part->price,
+            'stock' => $part->stock,
+            'unit' => $part->unit,
+            'image' => $newFile,
+            'is_active' => '1',
+        ])->assertRedirect(route('admin.spare-parts.index'));
+
+        $part->refresh();
+        $this->assertNotSame($externalUrl, $part->image);
+        $this->assertFalse($part->isExternalImage());
+        Storage::disk('public')->assertExists($part->image);
+    }
+
+    public function test_validasi_image_url_harus_format_url(): void
+    {
+        $response = $this->actingAs($this->admin)->post(route('admin.spare-parts.store'), [
+            'part_number' => 'INVALID-URL',
+            'name' => 'Part Test',
+            'category' => 'mesin',
+            'price' => '100.000',
+            'stock' => '5',
+            'unit' => 'pcs',
+            'image_url' => 'bukan-url-valid',
+        ]);
+
+        $response->assertSessionHasErrors(['image_url']);
+    }
+
+    public function test_validasi_anti_ssrf_menolak_ip_privat_dan_localhost(): void
+    {
+        $blockedUrls = [
+            'http://127.0.0.1/internal-secret.png',
+            'http://localhost/secret.jpg',
+            'http://169.254.169.254/latest/meta-data',
+            'http://192.168.1.100/router-config.png',
+            'http://10.0.0.1/private.png',
+        ];
+
+        foreach ($blockedUrls as $index => $url) {
+            $response = $this->actingAs($this->admin)->post(route('admin.spare-parts.store'), [
+                'part_number' => 'SSRF-BLOCKED-'.$index,
+                'name' => 'Spare Part Test SSRF '.$index,
+                'category' => 'mesin',
+                'price' => '100.000',
+                'stock' => '5',
+                'unit' => 'pcs',
+                'image_url' => $url,
+            ]);
+
+            $response->assertSessionHasErrors(['image_url']);
+            $this->assertDatabaseMissing('spare_parts', ['part_number' => 'SSRF-BLOCKED-'.$index]);
+        }
+    }
+
     public function test_validasi_tambah_spare_part(): void
     {
         SparePart::factory()->create(['part_number' => 'SKU-001']);

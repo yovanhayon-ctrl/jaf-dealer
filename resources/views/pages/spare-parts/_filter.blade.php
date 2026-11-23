@@ -1,4 +1,4 @@
-@props(['filters', 'categories', 'idPrefix' => ''])
+@props(['filters', 'categories', 'carModels' => [], 'idPrefix' => ''])
 
 @php
     $id = fn (string $name) => "{$idPrefix}filter_{$name}";
@@ -13,15 +13,25 @@
     <div class="mb-3">
         <label for="{{ $id('q') }}" class="form-label small fw-semibold mb-1">Kata kunci</label>
         <input type="search" id="{{ $id('q') }}" name="q" value="{{ $filters['q'] ?? '' }}"
-               class="form-control form-control-sm" placeholder="Nama part atau model mobil…">
+               class="form-control form-control-sm" placeholder="Nama part atau nomor part…">
     </div>
 
     <div class="mb-3">
         <label for="{{ $id('kategori') }}" class="form-label small fw-semibold mb-1">Kategori</label>
         <select id="{{ $id('kategori') }}" name="kategori" class="form-select form-select-sm">
-            <option value="">Semua</option>
+            <option value="">Semua Kategori</option>
             @foreach ($categories as $val => $label)
                 <option value="{{ $val }}" @selected(($filters['kategori'] ?? '') === $val)>{{ $label }}</option>
+            @endforeach
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label for="{{ $id('model') }}" class="form-label small fw-semibold mb-1">Kompatibilitas Mobil</label>
+        <select id="{{ $id('model') }}" name="model" class="form-select form-select-sm">
+            <option value="">Semua Mobil</option>
+            @foreach ($carModels as $val => $info)
+                <option value="{{ $val }}" @selected(($filters['model'] ?? '') === $val)>{{ $info['label'] }}</option>
             @endforeach
         </select>
     </div>

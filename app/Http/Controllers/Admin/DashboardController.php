@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Car;
 use App\Models\PurchaseRequest;
 use App\Models\ServiceBooking;
+use App\Models\SparePart;
 use App\Models\TestDrive;
 use App\Models\Testimonial;
 use App\Models\User;
@@ -27,6 +28,8 @@ class DashboardController extends Controller
         }
 
         $canSeeBackup = $user->can('backup.manage');
+        $topSales = $this->topSales();
+        $topMechanics = $this->topMechanics();
 
         if ($user->isOwner()) {
             return view('admin.dashboard', [
@@ -36,6 +39,8 @@ class DashboardController extends Controller
                 'ownerStats' => $this->ownerStats(),
                 'trend' => (new DashboardTrend)->months(),
                 'stats' => $this->stats(),
+                'topSales' => $topSales,
+                'topMechanics' => $topMechanics,
             ]);
         }
 
@@ -122,6 +127,8 @@ class DashboardController extends Controller
                 ->orderBy('preferred_time')
                 ->limit(5)
                 ->get(),
+            'topSales' => $topSales,
+            'topMechanics' => $topMechanics,
         ]);
     }
 
@@ -146,19 +153,31 @@ class DashboardController extends Controller
         $serviceRow = DB::table('service_bookings')
             ->whereBetween('preferred_date', [$currentMonthStart, $currentMonthEnd])
             ->where('status', ServiceBooking::STATUS_COMPLETED)
-            ->selectRaw('COUNT(*) as services_completed, COALESCE(SUM(service_price), 0) as service_revenue')
+            ->selectRaw('COUNT(*) as services_completed, COALESCE(SUM(service_price), 0) as labor_revenue')
+            ->first();
+
+        $sparePartsRow = DB::table('service_booking_spare_parts')
+            ->join('service_bookings', 'service_bookings.id', '=', 'service_booking_spare_parts.service_booking_id')
+            ->where('service_bookings.status', ServiceBooking::STATUS_COMPLETED)
+            ->whereBetween('service_bookings.preferred_date', [$currentMonthStart, $currentMonthEnd])
+            ->selectRaw('COALESCE(SUM(service_booking_spare_parts.subtotal), 0) as spare_parts_revenue')
             ->first();
 
         $salesRevenue = (int) ($salesRow->sales_revenue ?? 0);
-        $serviceRevenue = (int) ($serviceRow->service_revenue ?? 0);
+        $laborRevenue = (int) ($serviceRow->labor_revenue ?? 0);
+        $sparePartsRevenue = (int) ($sparePartsRow->spare_parts_revenue ?? 0);
+        $serviceRevenue = $laborRevenue + $sparePartsRevenue;
 
         return [
             'sales_revenue' => $salesRevenue,
             'service_revenue' => $serviceRevenue,
+            'service_labor_revenue' => $laborRevenue,
+            'service_spare_parts_revenue' => $sparePartsRevenue,
             'total_revenue' => $salesRevenue + $serviceRevenue,
             'units_sold' => (int) ($salesRow->units_sold ?? 0),
             'services_completed' => (int) ($serviceRow->services_completed ?? 0),
             'out_of_stock_cars' => Car::where('is_active', true)->where('stock', 0)->count(),
+            'low_stock_spare_parts' => SparePart::where('is_active', true)->whereColumn('stock', '<=', 'min_stock')->count(),
         ];
     }
 
@@ -177,6 +196,8 @@ class DashboardController extends Controller
         return [
             'active_cars' => (int) $cars->active,
             'out_of_stock_cars' => (int) $cars->out_of_stock,
+            'active_spare_parts' => SparePart::where('is_active', true)->count(),
+            'low_stock_spare_parts' => SparePart::where('is_active', true)->whereColumn('stock', '<=', 'min_stock')->count(),
             'pending_test_drives' => TestDrive::where('status', 'pending')->count(),
             'pending_purchases' => PurchaseRequest::where('status', 'pending')->count(),
             'pending_service_bookings' => ServiceBooking::where('status', ServiceBooking::STATUS_PENDING)->count(),
@@ -191,5 +212,53 @@ class DashboardController extends Controller
             'unconfirmed_test_drives_tomorrow' => TestDrive::query()->where('status', TestDrive::STATUS_PENDING)->whereDate('preferred_date', today()->addDay())->count(),
             'unconfirmed_service_bookings_tomorrow' => ServiceBooking::query()->where('status', ServiceBooking::STATUS_PENDING)->whereDate('preferred_date', today()->addDay())->count(),
         ];
+    }
+
+    /**
+     * Top 3 Sales berdasarkan unit terjual, omset penjualan, dan test drive selesai.
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, User>
+     */
+    private function topSales(int $limit = 3): \Illuminate\Database\Eloquent\Collection
+    {
+        return User::query()
+            ->where('role', User::ROLE_SALES)
+            ->where('is_active', true)
+            ->withCount([
+                'salesPurchaseRequests as sold_units_count' => fn ($q) => $q->whereIn('status', PurchaseRequest::SOLD_STATUSES),
+                'salesTestDrives as completed_test_drives_count' => fn ($q) => $q->where('status', TestDrive::STATUS_COMPLETED),
+            ])
+            ->withSum([
+                'salesPurchaseRequests as sales_revenue' => fn ($q) => $q->whereIn('status', PurchaseRequest::SOLD_STATUSES),
+            ], 'car_price')
+            ->orderByDesc('sold_units_count')
+            ->orderByDesc('sales_revenue')
+            ->orderByDesc('completed_test_drives_count')
+            ->orderBy('name')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * Top 3 Mekanik berdasarkan rata-rata rating, jumlah servis selesai, dan jumlah ulasan.
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, User>
+     */
+    private function topMechanics(int $limit = 3): \Illuminate\Database\Eloquent\Collection
+    {
+        return User::query()
+            ->where('role', User::ROLE_MECHANIC)
+            ->where('is_active', true)
+            ->withAvg('mechanicRatings as avg_rating', 'rating')
+            ->withCount([
+                'mechanicRatings as reviews_count',
+                'assignedServiceBookings as completed_services_count' => fn ($q) => $q->where('status', ServiceBooking::STATUS_COMPLETED),
+            ])
+            ->orderByRaw('COALESCE(avg_rating, 0) DESC')
+            ->orderByDesc('completed_services_count')
+            ->orderByDesc('reviews_count')
+            ->orderBy('name')
+            ->limit($limit)
+            ->get();
     }
 }

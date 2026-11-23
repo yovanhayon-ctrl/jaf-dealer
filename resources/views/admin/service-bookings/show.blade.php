@@ -20,6 +20,10 @@
         @if ($booking->isOverdue())
             <x-status-badge status="rejected" label="Lewat jadwal" />
         @endif
+        <a href="{{ route('admin.service-bookings.print-work-order', $booking) }}" target="_blank"
+           class="btn btn-sm btn-outline-dark ms-2" title="Cetak Nota Checklist & SPK Servis">
+            <i class="bi bi-printer me-1"></i>Cetak Nota Checklist
+        </a>
     </x-admin.detail-header>
 
     <div class="row g-4">
@@ -74,8 +78,10 @@
                         <dt>Nomor HP</dt>
                         <dd>
                             <a href="tel:{{ $booking->phone }}">{{ $booking->phone }}</a>
-                            <a href="https://wa.me/{{ preg_replace('/^0/', '62', preg_replace('/\D/', '', $booking->phone)) }}" target="_blank" rel="noopener"
-                               class="btn btn-sm btn-outline-success py-0 ms-2"><i class="bi bi-whatsapp"></i>WhatsApp</a>
+                            @if ($waUrl = $booking->whatsappContactUrl(auth()->user()))
+                                <a href="{{ $waUrl }}" target="_blank" rel="noopener"
+                                   class="btn btn-sm btn-outline-success py-0 ms-2"><i class="bi bi-whatsapp"></i>WhatsApp</a>
+                            @endif
                         </dd>
 
                         <dt>Keluhan</dt>
@@ -85,6 +91,8 @@
             </div>
 
             @include('admin.service-bookings._work')
+
+            @include('admin.service-bookings._spare_parts')
 
             @if ($booking->status === \App\Models\ServiceBooking::STATUS_CONFIRMED && $booking->preferred_date->isAfter(today()))
                 <div class="alert alert-info small">
