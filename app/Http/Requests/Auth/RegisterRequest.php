@@ -32,9 +32,12 @@ class RegisterRequest extends FormRequest
      */
     public function rules(): array
     {
+        // Di luar environment testing, cek DNS domain email agar domain fiktif (mis. @contoh.com) langsung ditolak.
+        $emailRule = app()->environment('testing') ? 'email' : 'email:rfc,dns';
+
         return [
             'name' => ['required', 'string', 'max:100'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            'email' => ['required', 'string', $emailRule, 'max:255', 'unique:users,email'],
             'phone' => ['required', 'regex:'.self::PHONE_REGEX],
             'password' => ['required', 'confirmed', Password::min(8)],
         ];

@@ -92,7 +92,16 @@ class TestDriveBookingTest extends TestCase
             'phone' => '081299998888',
             'password' => 'rahasia123',
             'password_confirmation' => 'rahasia123',
-        ])->assertRedirect($url);
+        ])->assertRedirect(route('verification.notice'));
+
+        $user = User::firstWhere('email', 'sinta@example.test');
+        $verifyUrl = \Illuminate\Support\Facades\URL::temporarySignedRoute(
+            'verification.verify',
+            now()->addMinutes(60),
+            ['id' => $user->id, 'hash' => sha1($user->getEmailForVerification())]
+        );
+
+        $this->actingAs($user)->get($verifyUrl)->assertRedirect($url);
     }
 
     public function test_tamu_tidak_bisa_mengirim_booking(): void

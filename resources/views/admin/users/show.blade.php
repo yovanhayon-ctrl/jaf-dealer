@@ -28,7 +28,18 @@
                     <h3 class="admin-card-title">Profil</h3>
                     <dl class="admin-detail-list admin-detail-list-stacked">
                         <dt>Email</dt>
-                        <dd><a href="mailto:{{ $user->email }}">{{ $user->email }}</a></dd>
+                        <dd>
+                            <a href="mailto:{{ $user->email }}">{{ $user->email }}</a>
+                            @if ($user->hasVerifiedEmail())
+                                <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle ms-2">
+                                    <i class="bi bi-patch-check-fill me-1" aria-hidden="true"></i>Terverifikasi
+                                </span>
+                            @else
+                                <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis border border-warning-subtle ms-2">
+                                    <i class="bi bi-clock-history me-1" aria-hidden="true"></i>Belum Verifikasi
+                                </span>
+                            @endif
+                        </dd>
 
                         <dt>Nomor HP</dt>
                         <dd>

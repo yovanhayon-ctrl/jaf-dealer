@@ -7,7 +7,9 @@
 @endsection
 
 @php
-    $activeFilters = ($filters['q'] !== null ? 1 : 0) + ($filters['role'] !== \App\Models\User::ROLE_CUSTOMER ? 1 : 0);
+    $activeFilters = ($filters['q'] !== null ? 1 : 0)
+        + ($filters['role'] !== \App\Models\User::ROLE_CUSTOMER ? 1 : 0)
+        + ($filters['verifikasi'] !== 'semua' ? 1 : 0);
 @endphp
 
 @section('content')
@@ -29,6 +31,14 @@
                 </select>
             </div>
         @endcan
+        <div class="col-6 col-md-4 col-lg-auto">
+            <label for="filter_verifikasi" class="form-label small mb-1">Verifikasi</label>
+            <select id="filter_verifikasi" name="verifikasi" class="form-select form-select-sm">
+                @foreach (\App\Http\Controllers\Admin\UserController::VERIFICATION_FILTERS as $value => $label)
+                    <option value="{{ $value }}" @selected($filters['verifikasi'] === $value)>{{ $label }}</option>
+                @endforeach
+            </select>
+        </div>
         <div class="col-6 col-md-4 col-lg-auto">
             <label for="filter_urut" class="form-label small mb-1">Urutkan</label>
             <select id="filter_urut" name="urut" class="form-select form-select-sm">
@@ -54,6 +64,7 @@
                             <th>Email</th>
                             <th>Nomor HP</th>
                             <th>Role</th>
+                            <th>Verifikasi</th>
                             <th class="text-center">Test Drive</th>
                             <th class="text-center">Pengajuan</th>
                             <th class="text-center">Servis</th>
@@ -71,6 +82,17 @@
                                 <td class="small"><span class="admin-truncate" title="{{ $user->email }}">{{ $user->email }}</span></td>
                                 <td class="text-nowrap">{{ $user->phone ?: '—' }}</td>
                                 <td>@include('admin.users._role-badge')</td>
+                                <td class="text-nowrap">
+                                    @if ($user->hasVerifiedEmail())
+                                        <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle">
+                                            <i class="bi bi-patch-check-fill me-1" aria-hidden="true"></i>Terverifikasi
+                                        </span>
+                                    @else
+                                        <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis border border-warning-subtle">
+                                            <i class="bi bi-clock-history me-1" aria-hidden="true"></i>Belum Verifikasi
+                                        </span>
+                                    @endif
+                                </td>
                                 <td class="text-center">{{ $user->test_drives_count }}</td>
                                 <td class="text-center">{{ $user->purchase_requests_count }}</td>
                                 <td class="text-center">{{ $user->service_bookings_count }}</td>

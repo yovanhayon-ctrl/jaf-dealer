@@ -31,6 +31,12 @@ class UserController extends Controller
         'semua' => 'Semua',
     ];
 
+    public const VERIFICATION_FILTERS = [
+        'semua' => 'Semua Status',
+        'terverifikasi' => 'Terverifikasi',
+        'belum' => 'Belum Verifikasi',
+    ];
+
     public function index(Request $request): View
     {
         $filters = $this->filters($request);
@@ -38,7 +44,7 @@ class UserController extends Controller
 
         $users = User::query()
             // Password & remember_token tidak pernah diambil dari database.
-            ->select(['id', 'name', 'email', 'phone', 'role', 'is_active', 'created_at'])
+            ->select(['id', 'name', 'email', 'email_verified_at', 'phone', 'role', 'is_active', 'created_at'])
             ->withCount(['testDrives', 'purchaseRequests', 'serviceBookings'])
             ->tap(fn (Builder $query) => $this->applyFilters($query, $filters))
             ->orderBy($sortColumn, $sortDirection)
@@ -49,7 +55,7 @@ class UserController extends Controller
         return view('admin.users.index', [
             'users' => $users,
             'filters' => $filters,
-            'hasFilters' => $filters['q'] !== null || $filters['role'] !== User::ROLE_CUSTOMER,
+            'hasFilters' => $filters['q'] !== null || $filters['role'] !== User::ROLE_CUSTOMER || $filters['verifikasi'] !== 'semua',
         ]);
     }
 
@@ -75,7 +81,7 @@ class UserController extends Controller
     /**
      * Ambil filter dari query string; nilai yang tidak dikenal diabaikan.
      *
-     * @return array{q: ?string, role: string, urut: string}
+     * @return array{q: ?string, role: string, verifikasi: string, urut: string}
      */
     private function filters(Request $request): array
     {
@@ -86,6 +92,7 @@ class UserController extends Controller
             'role' => $request->user()->hasPermission('staff-accounts.view')
                 ? ($pick('role', array_keys(self::ROLE_FILTERS)) ?? User::ROLE_CUSTOMER)
                 : User::ROLE_CUSTOMER,
+            'verifikasi' => $pick('verifikasi', array_keys(self::VERIFICATION_FILTERS)) ?? 'semua',
             'urut' => $pick('urut', array_keys(self::SORTS)) ?? 'terbaru',
         ];
     }
@@ -97,6 +104,8 @@ class UserController extends Controller
                 ->where('name', 'like', "%{$search}%")
                 ->orWhere('email', 'like', "%{$search}%")
                 ->orWhere('phone', 'like', "%{$search}%")))
-            ->when($filters['role'] !== 'semua', fn ($q) => $q->where('role', $filters['role']));
+            ->when($filters['role'] !== 'semua', fn ($q) => $q->where('role', $filters['role']))
+            ->when($filters['verifikasi'] === 'terverifikasi', fn ($q) => $q->whereNotNull('email_verified_at'))
+            ->when($filters['verifikasi'] === 'belum', fn ($q) => $q->whereNull('email_verified_at'));
     }
 }

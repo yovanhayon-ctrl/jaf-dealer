@@ -300,4 +300,31 @@ class UserManagementTest extends TestCase
 
         $this->assertSame(0, User::where('role', User::ROLE_CUSTOMER)->count());
     }
+
+    public function test_daftar_pengguna_menampilkan_badge_dan_filter_status_verifikasi(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $verified = User::factory()->create(['name' => 'Customer Verified', 'email_verified_at' => now()]);
+        $unverified = User::factory()->create(['name' => 'Customer Belum Verif', 'email_verified_at' => null]);
+
+        $this->actingAs($admin)
+            ->get(route('admin.users.index'))
+            ->assertOk()
+            ->assertSee($verified->name)
+            ->assertSee($unverified->name)
+            ->assertSee('Terverifikasi')
+            ->assertSee('Belum Verifikasi');
+
+        $this->actingAs($admin)
+            ->get(route('admin.users.index', ['verifikasi' => 'belum']))
+            ->assertOk()
+            ->assertSee($unverified->name)
+            ->assertDontSee($verified->name);
+
+        $this->actingAs($admin)
+            ->get(route('admin.users.index', ['verifikasi' => 'terverifikasi']))
+            ->assertOk()
+            ->assertSee($verified->name)
+            ->assertDontSee($unverified->name);
+    }
 }

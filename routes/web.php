@@ -30,6 +30,7 @@ use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\Admin\TestDriveController as AdminTestDriveController;
 use App\Http\Controllers\Admin\TestimonialController as AdminTestimonialController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
@@ -115,6 +116,18 @@ Route::post('/logout', [LoginController::class, 'destroy'])
     ->middleware('auth')
     ->name('logout');
 
+// Verifikasi email customer setelah mendaftar.
+Route::middleware('auth')->group(function () {
+    Route::get('/email/verify', [EmailVerificationController::class, 'notice'])
+        ->name('verification.notice');
+    Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
+        ->middleware(['signed', 'throttle:6,1'])
+        ->name('verification.verify');
+    Route::post('/email/verification-notification', [EmailVerificationController::class, 'send'])
+        ->middleware('throttle:6,1')
+        ->name('verification.send');
+});
+
 /*
 |--------------------------------------------------------------------------
 | Customer (wajib login)
@@ -122,25 +135,27 @@ Route::post('/logout', [LoginController::class, 'destroy'])
 */
 
 Route::middleware('auth')->group(function () {
-    Route::get('/test-drive', [TestDriveController::class, 'create'])->name('test-drives.create');
-    Route::post('/test-drive', [TestDriveController::class, 'store'])
-        ->middleware('throttle:test-drive-booking')
-        ->name('test-drives.store');
+    Route::middleware('verified')->group(function () {
+        Route::get('/test-drive', [TestDriveController::class, 'create'])->name('test-drives.create');
+        Route::post('/test-drive', [TestDriveController::class, 'store'])
+            ->middleware('throttle:test-drive-booking')
+            ->name('test-drives.store');
 
-    Route::get('/mobil/{car:slug}/ajukan', [PurchaseRequestController::class, 'create'])->name('purchase-requests.create');
-    Route::post('/mobil/{car:slug}/ajukan', [PurchaseRequestController::class, 'store'])
-        ->middleware('throttle:purchase-request')
-        ->name('purchase-requests.store');
+        Route::get('/mobil/{car:slug}/ajukan', [PurchaseRequestController::class, 'create'])->name('purchase-requests.create');
+        Route::post('/mobil/{car:slug}/ajukan', [PurchaseRequestController::class, 'store'])
+            ->middleware('throttle:purchase-request')
+            ->name('purchase-requests.store');
+
+        Route::get('/servis/booking', [ServiceBookingController::class, 'create'])->name('service-bookings.create');
+        Route::post('/servis/booking', [ServiceBookingController::class, 'store'])
+            ->middleware('throttle:service-booking')
+            ->name('service-bookings.store');
+    });
 
     Route::middleware('throttle:30,1')->controller(FavoriteController::class)->group(function () {
         Route::post('/mobil/{car:slug}/favorit', 'store')->name('favorites.store');
         Route::delete('/mobil/{car:slug}/favorit', 'destroy')->name('favorites.destroy');
     });
-
-    Route::get('/servis/booking', [ServiceBookingController::class, 'create'])->name('service-bookings.create');
-    Route::post('/servis/booking', [ServiceBookingController::class, 'store'])
-        ->middleware('throttle:service-booking')
-        ->name('service-bookings.store');
 
     Route::prefix('akun')->name('account.')->group(function () {
         Route::get('profil', [ProfileController::class, 'edit'])->name('profile');

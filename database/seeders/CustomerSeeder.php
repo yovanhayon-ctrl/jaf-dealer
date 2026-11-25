@@ -42,6 +42,9 @@ class CustomerSeeder extends Seeder
                 $user->email_verified_at = now();
                 $user->save();
                 $created++;
+            } elseif ($user->email_verified_at === null) {
+                $user->email_verified_at = now();
+                $user->save();
             }
         }
 

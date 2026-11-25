@@ -2,8 +2,9 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Builder;
@@ -12,10 +13,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Throwable;
 
 #[Fillable(['name', 'email', 'phone', 'password'])]
 #[Hidden(['password', 'remember_token'])]
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
@@ -317,5 +319,18 @@ class User extends Authenticatable
         $text = "Halo {$this->name}, {$sender}. Apakah ada yang bisa kami bantu terkait layanan di {$dealerName}? Terima kasih.";
 
         return "https://wa.me/{$number}?text=".rawurlencode($text);
+    }
+
+    /**
+     * Kirim email verifikasi dengan penanganan error agar kegagalan SMTP (offline/timeout)
+     * tidak memicu error 500 fatal saat registrasi atau kirim ulang.
+     */
+    public function sendEmailVerificationNotification(): void
+    {
+        try {
+            $this->notify(new VerifyEmail);
+        } catch (Throwable $e) {
+            report($e);
+        }
     }
 }

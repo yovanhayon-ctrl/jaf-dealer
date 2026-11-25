@@ -53,7 +53,7 @@ class SecurityTest extends TestCase
         $this->post(route('register.store'), [
             'name' => 'Budi', 'email' => 'budi@example.test', 'phone' => '081234567890',
             'password' => 'rahasia-123', 'password_confirmation' => 'rahasia-123',
-        ])->assertRedirect(route('home'));
+        ])->assertRedirect(route('verification.notice'));
     }
 
     public function test_referer_internal_tetap_dipakai_setelah_login(): void

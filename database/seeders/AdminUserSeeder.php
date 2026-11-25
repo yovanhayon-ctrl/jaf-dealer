@@ -28,6 +28,11 @@ class AdminUserSeeder extends Seeder
             // Owner tetap owner; role lain dinaikkan menjadi admin.
             if (! $user->isAdmin()) {
                 $user->role = User::ROLE_ADMIN;
+            }
+            if ($user->email_verified_at === null) {
+                $user->email_verified_at = now();
+            }
+            if ($user->isDirty()) {
                 $user->save();
             }
 
@@ -63,6 +68,11 @@ class AdminUserSeeder extends Seeder
             );
             if ($sales2->role !== User::ROLE_SALES) {
                 $sales2->role = User::ROLE_SALES;
+            }
+            if ($sales2->email_verified_at === null) {
+                $sales2->email_verified_at = now();
+            }
+            if ($sales2->isDirty()) {
                 $sales2->save();
             }
         }

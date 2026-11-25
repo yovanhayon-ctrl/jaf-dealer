@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\Concerns\RedirectsAfterAuthentication;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Models\User;
+use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -29,10 +30,13 @@ class RegisterController extends Controller
         $user->role = User::ROLE_CUSTOMER;
         $user->save();
 
+        event(new Registered($user));
+
         Auth::login($user);
 
         $request->session()->regenerate();
 
-        return $this->redirectAfterAuthentication($request, $user, 'Pendaftaran berhasil. Selamat datang!');
+        return redirect()->route('verification.notice')
+            ->with('success', 'Pendaftaran berhasil! Silakan cek inbox email Anda dan klik tautan verifikasi.');
     }
 }

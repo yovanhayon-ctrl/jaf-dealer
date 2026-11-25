@@ -3,7 +3,9 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\User;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class RegisterTest extends TestCase
@@ -28,16 +30,21 @@ class RegisterTest extends TestCase
 
     public function test_register_membuat_customer_dan_langsung_login(): void
     {
+        Notification::fake();
+
         $response = $this->post('/register', $this->validData());
 
-        $response->assertRedirect(route('home'));
+        $response->assertRedirect(route('verification.notice'));
         $response->assertSessionHas('success');
 
         $user = User::firstWhere('email', 'budi@example.com');
         $this->assertNotNull($user);
         $this->assertSame(User::ROLE_CUSTOMER, $user->role);
         $this->assertSame('081234567890', $user->phone);
+        $this->assertNull($user->email_verified_at);
         $this->assertAuthenticatedAs($user);
+
+        Notification::assertSentTo($user, VerifyEmail::class);
     }
 
     public function test_role_admin_dari_input_diabaikan(): void
