@@ -119,7 +119,7 @@
                     </div>
 
                     <ul class="small text-muted mt-3 mb-0">
-                        <li>Jadwal dapat dipilih mulai besok sampai 30 hari ke depan, pukul 09.00-16.00 WIB.</li>
+                        <li>Jadwal dapat dipilih mulai besok sampai 30 hari ke depan (Senin-Sabtu), pukul 08.00-16.00 WIB.</li>
                         <li>Status booking "Menunggu" sampai dikonfirmasi dealer; Anda bisa membatalkannya selama belum dikonfirmasi.</li>
                     </ul>
                 </div>
@@ -234,7 +234,7 @@
                                     <span class="badge rounded-circle bg-accent-subtle text-accent p-1 d-inline-flex align-items-center justify-content-center" style="width: 22px; height: 22px;">4</span>
                                     <div>
                                         <span class="fw-semibold">Jam Operasional:</span>
-                                        <span class="text-muted d-block">Jadwal sesi Test Drive tersedia pukul 09.00 – 16.00 WIB.</span>
+                                        <span class="text-muted d-block">Jadwal sesi Test Drive tersedia Senin-Sabtu, pukul 08.00-16.00 WIB (Minggu tutup).</span>
                                     </div>
                                 </li>
                             </ul>

@@ -99,7 +99,7 @@
                     <li class="mb-1">Konsultasi kebutuhan servis sesuai kondisi dan pemakaian kendaraan.</li>
                     <li class="mb-1">Informasi estimasi pekerjaan dan komponen yang perlu diperiksa.</li>
                     <li class="mb-1">Riwayat servis tersimpan di akun Anda.</li>
-                    <li>Jadwal bengkel: besok s/d 30 hari ke depan, pukul {{ reset($slots) }}-{{ end($slots) }} WIB.</li>
+                    <li>Jadwal bengkel: hari ini (jeda min. 1 jam) s/d 30 hari ke depan (Senin-Sabtu), pukul {{ reset($slots) }}-{{ end($slots) }} WIB.</li>
                 </ul>
             </div>
         </div>
