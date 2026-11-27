@@ -8,6 +8,7 @@ use App\Models\Car;
 use App\Models\TestDrive;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
@@ -77,10 +78,18 @@ class TestDriveRequest extends FormRequest
                     return;
                 }
 
+                $date = $this->string('preferred_date')->value();
+
+                if (Carbon::parse($date, config('app.timezone', 'Asia/Jakarta'))->isSunday()) {
+                    $validator->errors()->add('preferred_date', 'Dealer tutup pada hari Minggu. Silakan pilih hari Senin–Sabtu.');
+
+                    return;
+                }
+
                 $conflicts = app(BookTestDrive::class)->conflicts(
                     $this->user(),
                     Car::findOrFail($this->integer('car_id')),
-                    $this->string('preferred_date')->value(),
+                    $date,
                     $this->string('preferred_time')->value(),
                 );
 
@@ -93,7 +102,13 @@ class TestDriveRequest extends FormRequest
 
     public static function firstDate(): string
     {
-        return today()->addDays(TestDrive::MIN_DAYS_AHEAD)->toDateString();
+        $date = today()->addDays(TestDrive::MIN_DAYS_AHEAD);
+
+        while ($date->isSunday()) {
+            $date = $date->addDay();
+        }
+
+        return $date->toDateString();
     }
 
     public static function lastDate(): string

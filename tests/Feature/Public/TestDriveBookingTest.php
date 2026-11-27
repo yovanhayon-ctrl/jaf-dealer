@@ -175,9 +175,9 @@ class TestDriveBookingTest extends TestCase
         $this->actingAs($this->customer)->get(route('test-drives.create'))
             ->assertOk()
             ->assertSee('value="081211112222"', false)
-            ->assertSee('min="2026-09-27"', false)
+            ->assertSee('min="2026-09-28"', false)
             ->assertSee('max="2026-10-26"', false)
-            ->assertSeeInOrder(['value="09:00"', '09:00 WIB', 'value="16:00"', '16:00 WIB'], false)
+            ->assertSeeInOrder(['value="08:00"', '08:00 WIB', 'value="16:00"', '16:00 WIB'], false)
             ->assertSee('data-disable-on-submit', false);
     }
 
@@ -194,7 +194,7 @@ class TestDriveBookingTest extends TestCase
             'tanggal +31 hari' => [['preferred_date' => '2026-10-27'], 'preferred_date'],
             'format tanggal salah' => [['preferred_date' => '01/10/2026'], 'preferred_date'],
             'tanggal kosong' => [['preferred_date' => ''], 'preferred_date'],
-            'jam 08:00' => [['preferred_time' => '08:00'], 'preferred_time'],
+            'jam 07:00' => [['preferred_time' => '07:00'], 'preferred_time'],
             'jam 17:00' => [['preferred_time' => '17:00'], 'preferred_time'],
             'jam 09:30' => [['preferred_time' => '09:30'], 'preferred_time'],
             'jam kosong' => [['preferred_time' => ''], 'preferred_time'],
@@ -224,7 +224,7 @@ class TestDriveBookingTest extends TestCase
     public static function validBoundaryProvider(): array
     {
         return [
-            'besok jam 09:00' => [['preferred_date' => '2026-09-27', 'preferred_time' => '09:00']],
+            'senin jam 08:00' => [['preferred_date' => '2026-09-28', 'preferred_time' => '08:00']],
             '+30 hari jam 16:00' => [['preferred_date' => '2026-10-26', 'preferred_time' => '16:00']],
             'catatan kosong' => [['notes' => '']],
             'catatan 500 karakter' => [['notes' => str_repeat('a', 500)]],
@@ -368,7 +368,7 @@ class TestDriveBookingTest extends TestCase
     public function test_rate_limit_booking_per_user(): void
     {
         foreach (range(1, TestDriveController::MAX_BOOKINGS_PER_MINUTE) as $i) {
-            $this->book(['preferred_time' => '08:00'])->assertSessionHasErrors('preferred_time');
+            $this->book(['preferred_time' => '07:00'])->assertSessionHasErrors('preferred_time');
         }
 
         $this->book()
@@ -427,5 +427,20 @@ class TestDriveBookingTest extends TestCase
     public function test_menu_navbar_test_drive_tampil(): void
     {
         $this->get(route('home'))->assertOk()->assertSee('href="'.route('test-drives.create').'"', false);
+    }
+
+    public function test_booking_hari_minggu_ditolak_dan_jam_operasional_08_sampai_16_diterima(): void
+    {
+        // 2026-10-04 adalah hari Minggu
+        $this->book(['preferred_date' => '2026-10-04', 'preferred_time' => '10:00'])
+            ->assertSessionHasErrors([
+                'preferred_date' => 'Dealer tutup pada hari Minggu. Silakan pilih hari Senin–Sabtu.',
+            ]);
+
+        $this->assertSame(0, TestDrive::count());
+
+        // Senin 2026-10-05 jam 08:00 dan 16:00 diterima
+        $this->book(['preferred_date' => '2026-10-05', 'preferred_time' => '08:00'])
+            ->assertSessionHasNoErrors();
     }
 }

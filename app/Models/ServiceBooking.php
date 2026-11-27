@@ -83,8 +83,8 @@ class ServiceBooking extends Model
     /** Customer hanya boleh membatalkan saat status ini. */
     public const CUSTOMER_CANCELLABLE_STATUSES = [self::STATUS_PENDING];
 
-    /** Slot jam booking servis (WIB), per jam 08:00–15:00. */
-    public const TIME_SLOTS = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00'];
+    /** Slot jam booking servis (WIB), per jam 08:00–16:00. */
+    public const TIME_SLOTS = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'];
 
     /** Jeda minimal pemesanan sebelum jam kedatangan servis (jam). */
     public const MIN_LEAD_HOURS = 1;
@@ -96,9 +96,9 @@ class ServiceBooking extends Model
 
     /**
      * Daftar slot jam yang masih dapat dipesan pada tanggal tertentu.
+     * Untuk hari Minggu atau tanggal masa lalu: array kosong [].
      * Untuk tanggal hari ini: hanya slot yang minimal berjarak MIN_LEAD_HOURS dari waktu sekarang.
-     * Untuk tanggal masa depan: seluruh TIME_SLOTS.
-     * Untuk tanggal masa lalu: array kosong [].
+     * Untuk tanggal masa depan (Senin–Sabtu): seluruh TIME_SLOTS.
      *
      * @return array<int, string>
      */
@@ -108,6 +108,10 @@ class ServiceBooking extends Model
         $today = today()->toDateString();
 
         if ($targetDate < $today) {
+            return [];
+        }
+
+        if (Carbon::parse($targetDate, config('app.timezone', 'Asia/Jakarta'))->isSunday()) {
             return [];
         }
 
@@ -125,15 +129,20 @@ class ServiceBooking extends Model
     }
 
     /**
-     * Tanggal paling awal yang dapat dipesan pelanggan.
-     * Jika hari ini masih memiliki slot jam yang valid (sebelum cutoff jam operasional), return hari ini.
-     * Jika seluruh slot hari ini sudah habis/terlewat, return besok (H+1).
+     * Tanggal paling awal yang dapat dipesan pelanggan (Senin–Sabtu).
+     * Otomatis melompati hari Minggu ke hari Senin.
      */
     public static function firstAvailableDate(): string
     {
-        return self::availableTimeSlots(today()->toDateString()) !== []
-            ? today()->toDateString()
-            : today()->addDay()->toDateString();
+        $date = self::availableTimeSlots(today()->toDateString()) !== []
+            ? today()
+            : today()->addDay();
+
+        while ($date->isSunday()) {
+            $date = $date->addDay();
+        }
+
+        return $date->toDateString();
     }
 
     protected function casts(): array

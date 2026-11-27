@@ -100,6 +100,13 @@ class ServiceBookingRequest extends FormRequest
 
                 $date = $this->string('preferred_date')->value();
                 $time = $this->string('preferred_time')->value();
+
+                if (Carbon::parse($date, config('app.timezone', 'Asia/Jakarta'))->isSunday()) {
+                    $validator->errors()->add('preferred_date', 'Dealer tutup pada hari Minggu. Silakan pilih hari Senin–Sabtu.');
+
+                    return;
+                }
+
                 $validSlots = ServiceBooking::availableTimeSlots($date);
 
                 if (! in_array($time, $validSlots, true)) {

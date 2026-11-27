@@ -183,7 +183,27 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (dateInput) {
-        dateInput.addEventListener('change', updateAvailableTimeSlots);
+        var checkSundayService = function () {
+            var val = dateInput.value;
+            if (!val) {
+                dateInput.setCustomValidity('');
+                return;
+            }
+            var parts = val.split('-');
+            if (parts.length !== 3) return;
+            var picked = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+            if (picked.getDay() === 0) {
+                dateInput.setCustomValidity('Dealer tutup pada hari Minggu. Silakan pilih hari Senin–Sabtu.');
+                dateInput.reportValidity();
+                dateInput.value = '';
+            } else {
+                dateInput.setCustomValidity('');
+            }
+        };
+        dateInput.addEventListener('change', function () {
+            checkSundayService();
+            updateAvailableTimeSlots();
+        });
         dateInput.addEventListener('input', updateAvailableTimeSlots);
     }
 

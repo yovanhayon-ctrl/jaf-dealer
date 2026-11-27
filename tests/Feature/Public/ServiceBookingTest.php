@@ -84,7 +84,7 @@ class ServiceBookingTest extends TestCase
             ->assertSeeInOrder(['Servis Berkala', 'Rp 450.000', '±120 menit', 'Suku Cadang', 'hubungi dealer'])
             ->assertDontSee('Layanan Lama')
             ->assertSee('href="'.route('service-bookings.create', ['layanan' => 'servis-berkala']).'"', false)
-            ->assertSee('08:00-15:00 WIB');
+            ->assertSee('08:00-16:00 WIB');
     }
 
     public function test_halaman_servis_kosong(): void
@@ -198,7 +198,7 @@ class ServiceBookingTest extends TestCase
             'tanggal hari ini jam mepet' => [['preferred_date' => '2026-10-08', 'preferred_time' => '10:00'], 'preferred_time'],
             'tanggal lewat 30 hari' => [['preferred_date' => '2026-11-08'], 'preferred_date'],
             'tanggal format salah' => [['preferred_date' => '12/10/2026'], 'preferred_date'],
-            'jam di luar slot' => [['preferred_time' => '16:00'], 'preferred_time'],
+            'jam di luar slot' => [['preferred_time' => '17:00'], 'preferred_time'],
             'jam bukan slot penuh' => [['preferred_time' => '09:30'], 'preferred_time'],
             'nomor tidak valid' => [['phone' => '021555'], 'phone'],
             'keluhan terlalu panjang' => [['complaint' => str_repeat('a', 501)], 'complaint'],
@@ -386,5 +386,20 @@ class ServiceBookingTest extends TestCase
             ->assertSessionHasErrors([
                 'preferred_date' => 'Pendaftaran servis untuk hari ini telah ditutup. Silakan pilih jadwal mulai besok (09 Okt 2026).',
             ]);
+    }
+
+    public function test_booking_servis_hari_minggu_ditolak_dan_jam_16_diterima(): void
+    {
+        // 2026-10-11 adalah hari Minggu
+        $this->book(['preferred_date' => '2026-10-11', 'preferred_time' => '10:00'])
+            ->assertSessionHasErrors([
+                'preferred_date' => 'Dealer tutup pada hari Minggu. Silakan pilih hari Senin–Sabtu.',
+            ]);
+
+        $this->assertSame(0, ServiceBooking::count());
+
+        // Senin 2026-10-12 jam 16:00 diterima
+        $this->book(['preferred_date' => '2026-10-12', 'preferred_time' => '16:00'])
+            ->assertSessionHasNoErrors();
     }
 }

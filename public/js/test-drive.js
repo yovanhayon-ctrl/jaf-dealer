@@ -73,4 +73,27 @@ document.addEventListener('DOMContentLoaded', function () {
     if (select.value) {
         updatePreview(select.value);
     }
+
+    // Blokir pemilihan hari Minggu di kalender (Operasional Senin–Sabtu)
+    var dateInput = document.getElementById('preferred_date');
+    if (dateInput) {
+        var checkSunday = function () {
+            var val = dateInput.value;
+            if (!val) {
+                dateInput.setCustomValidity('');
+                return;
+            }
+            var parts = val.split('-');
+            if (parts.length !== 3) return;
+            var picked = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+            if (picked.getDay() === 0) {
+                dateInput.setCustomValidity('Dealer tutup pada hari Minggu. Silakan pilih hari Senin–Sabtu.');
+                dateInput.reportValidity();
+                dateInput.value = '';
+            } else {
+                dateInput.setCustomValidity('');
+            }
+        };
+        dateInput.addEventListener('change', checkSunday);
+    }
 });

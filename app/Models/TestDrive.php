@@ -72,8 +72,8 @@ class TestDrive extends Model
     /** Customer hanya boleh membatalkan saat status ini (RANCANGAN §5). */
     public const CUSTOMER_CANCELLABLE_STATUSES = [self::STATUS_PENDING];
 
-    /** Slot jam booking (WIB), per jam 09:00–16:00. */
-    public const TIME_SLOTS = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'];
+    /** Slot jam booking (WIB), per jam 08:00–16:00. */
+    public const TIME_SLOTS = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'];
 
     /** Rentang tanggal booking: besok s/d hari ini + 30 hari (WIB). */
     public const MIN_DAYS_AHEAD = 1;

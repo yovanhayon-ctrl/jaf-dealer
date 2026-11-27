@@ -8,6 +8,7 @@ use App\Http\Requests\TestDriveRequest;
 use App\Models\ServiceBooking;
 use App\Models\TestDrive;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
@@ -53,9 +54,17 @@ class RescheduleRequest extends FormRequest
                     return;
                 }
 
+                $date = $this->string('preferred_date')->value();
+
+                if (Carbon::parse($date, config('app.timezone', 'Asia/Jakarta'))->isSunday()) {
+                    $validator->errors()->add('preferred_date', 'Dealer tutup pada hari Minggu. Silakan pilih hari Senin–Sabtu.');
+
+                    return;
+                }
+
                 $message = app(RescheduleBooking::class)->conflict(
                     $this->booking(),
-                    $this->string('preferred_date')->value(),
+                    $date,
                     $this->string('preferred_time')->value(),
                 );
 
