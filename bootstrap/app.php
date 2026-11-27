@@ -8,6 +8,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Exceptions\InvalidSignatureException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -32,6 +33,19 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectUsersTo(fn (Request $request) => $request->user()?->homeRoute() ?? route('home'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Tautan verifikasi email yang kedaluwarsa/tidak valid diarahkan ramah ke halaman kirim ulang (bukan 403).
+        $exceptions->render(function (InvalidSignatureException $e, Request $request) {
+            if ($request->routeIs('verification.verify')) {
+                if ($request->user()?->hasVerifiedEmail()) {
+                    return redirect()->intended($request->user()->homeRoute())
+                        ->with('success', 'Email Anda sudah terverifikasi sebelumnya.');
+                }
+
+                return redirect()->route('verification.notice')
+                    ->with('error', 'Tautan verifikasi sudah kedaluwarsa atau tidak valid. Silakan klik Kirim Ulang untuk mendapatkan tautan baru.');
+            }
+        });
+
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );

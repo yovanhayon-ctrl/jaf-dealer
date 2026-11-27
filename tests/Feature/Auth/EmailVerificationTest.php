@@ -123,4 +123,22 @@ class EmailVerificationTest extends TestCase
             ->assertRedirect(route('verification.notice'))
             ->assertSessionHas('success');
     }
+
+    public function test_tautan_verifikasi_kedaluwarsa_diarahkan_ramah_ke_halaman_verifikasi(): void
+    {
+        $user = $this->unverifiedCustomer();
+
+        $expiredUrl = URL::temporarySignedRoute(
+            'verification.verify',
+            now()->subMinutes(5),
+            ['id' => $user->id, 'hash' => sha1($user->getEmailForVerification())]
+        );
+
+        $this->actingAs($user)
+            ->get($expiredUrl)
+            ->assertRedirect(route('verification.notice'))
+            ->assertSessionHas('error');
+
+        $this->assertNull($user->fresh()->email_verified_at);
+    }
 }
