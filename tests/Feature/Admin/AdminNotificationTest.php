@@ -308,4 +308,26 @@ class AdminNotificationTest extends TestCase
             ->assertOk()
             ->assertSee('Menunggu');
     }
+
+    public function test_sales_hanya_menerima_notifikasi_untuk_tugas_yang_ditugaskan_kepadanya(): void
+    {
+        $sales1 = User::factory()->sales()->create(['name' => 'Sales 1']);
+        $sales2 = User::factory()->sales()->create(['name' => 'Sales 2']);
+
+        $this->bookTestDrive();
+        $testDrive = TestDrive::sole();
+
+        // Saat baru masuk (belum ditugaskan), Sales 1 & Sales 2 tidak menerima notifikasi.
+        $this->assertSame(0, $sales1->notifications()->count());
+        $this->assertSame(0, $sales2->notifications()->count());
+
+        // Admin menugaskan ke Sales 1: hanya Sales 1 yang menerima notifikasi penugasan.
+        $this->actingAs($this->admin)->patch(route('admin.test-drives.assign-sales', $testDrive), [
+            'sales_id' => $sales1->id,
+        ])->assertRedirect();
+
+        $this->assertSame(1, $sales1->notifications()->count());
+        $this->assertSame(0, $sales2->notifications()->count());
+        $this->assertStringContainsString('Penugasan Test Drive', $sales1->notifications()->sole()->data['title']);
+    }
 }

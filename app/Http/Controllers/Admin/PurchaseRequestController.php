@@ -8,6 +8,8 @@ use App\Http\Requests\Admin\PurchaseRequestStatusRequest;
 use App\Models\ActivityLog;
 use App\Models\PurchaseRequest;
 use App\Models\User;
+use App\Notifications\Admin\AdminActivityNotification;
+use App\Notifications\Admin\PurchaseRequestActivity;
 use App\Notifications\Notifier;
 use App\Notifications\PurchaseRequestStatusChanged;
 use App\Support\PurchaseRequestPdf;
@@ -164,7 +166,12 @@ class PurchaseRequestController extends Controller
         ], ['sales_id.required' => 'Pilih sales.', 'sales_id.exists' => 'Sales tidak ditemukan atau sudah nonaktif.']);
 
         $sales = User::findOrFail($validated['sales_id']);
+        $changed = (int) $purchaseRequest->sales_id !== $sales->id;
         $purchaseRequest->update(['sales_id' => $sales->id]);
+
+        if ($changed) {
+            Notifier::send($sales, new PurchaseRequestActivity($purchaseRequest, AdminActivityNotification::ASSIGNED));
+        }
 
         return redirect()->route('admin.purchase-requests.show', $purchaseRequest)
             ->with('success', "Pengajuan berhasil ditugaskan ke Sales {$sales->name}.");

@@ -2,6 +2,8 @@
 
 namespace App\Notifications\Admin;
 
+use App\Models\PurchaseRequest;
+use App\Models\TestDrive;
 use App\Models\User;
 use App\Notifications\Concerns\BuildsNotificationMail;
 use App\Notifications\Notifier;
@@ -23,6 +25,8 @@ abstract class AdminActivityNotification extends Notification
 
     public const UPDATED = 'updated';
 
+    public const ASSIGNED = 'assigned';
+
     public function __construct(protected Model $record, protected string $event = self::CREATED) {}
 
     /** Contoh: "Test Drive". */
@@ -39,11 +43,23 @@ abstract class AdminActivityNotification extends Notification
 
     /**
      * Kirim ke semua staf panel aktif yang punya hak akses atas data ini.
+     * Khusus Sales: hanya menerima notifikasi untuk Test Drive / Pengajuan yang memang ditugaskan kepadanya.
      */
     public static function notifyAdmins(self $notification): void
     {
+        $record = $notification->record;
         $recipients = User::whereIn('role', User::PANEL_ROLES)->where('is_active', true)->get()
-            ->filter(fn (User $user) => $user->hasPermission($notification->permission()))
+            ->filter(function (User $user) use ($notification, $record): bool {
+                if (! $user->hasPermission($notification->permission())) {
+                    return false;
+                }
+
+                if ($user->isSales() && ($record instanceof TestDrive || $record instanceof PurchaseRequest)) {
+                    return $record->sales_id !== null && (int) $record->sales_id === $user->id;
+                }
+
+                return true;
+            })
             ->values();
 
         Notifier::send($recipients, $notification);
@@ -86,6 +102,7 @@ abstract class AdminActivityNotification extends Notification
         $title = match ($this->event) {
             self::CANCELLED => "{$this->subject()} Dibatalkan Customer",
             self::UPDATED => "{$this->subject()} Diperbarui",
+            self::ASSIGNED => "Penugasan {$this->subject()}",
             default => "{$this->subject()} Baru",
         };
 

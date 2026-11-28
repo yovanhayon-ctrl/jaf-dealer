@@ -8,6 +8,8 @@ use App\Http\Requests\Admin\RescheduleRequest;
 use App\Http\Requests\Admin\TestDriveStatusRequest;
 use App\Models\TestDrive;
 use App\Models\User;
+use App\Notifications\Admin\AdminActivityNotification;
+use App\Notifications\Admin\TestDriveActivity;
 use App\Notifications\Notifier;
 use App\Notifications\TestDriveStatusChanged;
 use DateTime;
@@ -159,7 +161,12 @@ class TestDriveController extends Controller
         ], ['sales_id.required' => 'Pilih sales.', 'sales_id.exists' => 'Sales tidak ditemukan atau sudah nonaktif.']);
 
         $sales = User::findOrFail($validated['sales_id']);
+        $changed = (int) $testDrive->sales_id !== $sales->id;
         $testDrive->update(['sales_id' => $sales->id]);
+
+        if ($changed) {
+            Notifier::send($sales, new TestDriveActivity($testDrive, AdminActivityNotification::ASSIGNED));
+        }
 
         return redirect()->route('admin.test-drives.show', $testDrive)
             ->with('success', "Test drive berhasil ditugaskan ke Sales {$sales->name}.");
