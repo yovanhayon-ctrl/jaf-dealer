@@ -231,6 +231,21 @@ class DashboardTest extends TestCase
             ->assertSee('Rp 500.000.000');
     }
 
+    public function test_leaderboard_tidak_menampilkan_sales_atau_mekanik_yang_belum_berkinerja(): void
+    {
+        $admin = User::factory()->admin()->create();
+        User::factory()->sales()->create(['name' => 'Sales Kosong']);
+        User::factory()->mechanic()->create(['name' => 'Mekanik Kosong']);
+
+        $this->actingAs($admin)->get('/admin/dashboard')
+            ->assertOk()
+            ->assertSee('Belum ada data sales')
+            ->assertSee('Belum ada data mekanik')
+            ->assertDontSee('Sales Kosong')
+            ->assertDontSee('Mekanik Kosong')
+            ->assertDontSee('Terbaik #1');
+    }
+
     private function seedDashboardData(int $count): void
     {
         // Tiap baris memakai customer & mobil (dengan merek) berbeda agar N+1 pasti terlihat.

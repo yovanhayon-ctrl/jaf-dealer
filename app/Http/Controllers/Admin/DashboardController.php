@@ -224,6 +224,10 @@ class DashboardController extends Controller
         return User::query()
             ->where('role', User::ROLE_SALES)
             ->where('is_active', true)
+            ->where(fn ($q) => $q
+                ->whereHas('salesPurchaseRequests', fn ($sq) => $sq->whereIn('status', PurchaseRequest::SOLD_STATUSES))
+                ->orWhereHas('salesTestDrives', fn ($tq) => $tq->where('status', TestDrive::STATUS_COMPLETED))
+            )
             ->withCount([
                 'salesPurchaseRequests as sold_units_count' => fn ($q) => $q->whereIn('status', PurchaseRequest::SOLD_STATUSES),
                 'salesTestDrives as completed_test_drives_count' => fn ($q) => $q->where('status', TestDrive::STATUS_COMPLETED),
@@ -249,6 +253,10 @@ class DashboardController extends Controller
         return User::query()
             ->where('role', User::ROLE_MECHANIC)
             ->where('is_active', true)
+            ->where(fn ($q) => $q
+                ->whereHas('assignedServiceBookings', fn ($bq) => $bq->where('status', ServiceBooking::STATUS_COMPLETED))
+                ->orWhereHas('mechanicRatings')
+            )
             ->withAvg('mechanicRatings as avg_rating', 'rating')
             ->withCount([
                 'mechanicRatings as reviews_count',
