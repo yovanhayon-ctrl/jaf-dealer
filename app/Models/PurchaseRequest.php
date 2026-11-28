@@ -416,7 +416,16 @@ class PurchaseRequest extends Model
         $dealerName = (string) config('dealer.name', 'JAF Dealer');
         $sender = $staff?->name ? "saya {$staff->name} dari {$dealerName}" : "kami dari {$dealerName}";
         $carLabel = trim("{$this->car->brand->name} {$this->car->name} {$this->car->year}");
-        $text = "Halo {$this->user->name}, {$sender}. Menghubungi Anda terkait pengajuan pembelian mobil {$carLabel} dengan No. Pengajuan {$this->documentNumber()} (Pembayaran: {$this->paymentMethodLabel()}). Apakah ada informasi atau berkas yang perlu kami bantu untuk proses pengajuan Anda? Terima kasih.";
+        $dueText = $this->paymentDueAt() ? ' Batas pembayaran pertama paling lambat '.$this->paymentDueAt()->translatedFormat('l, d M Y').'.' : '';
+
+        $text = match ($this->status) {
+            self::STATUS_APPROVED => "Halo {$this->user->name}, {$sender}. Selamat! Pengajuan pembelian mobil {$carLabel} ({$this->documentNumber()}, Pembayaran: {$this->paymentMethodLabel()}) telah DISETUJUI.{$dueText} Silakan unggah bukti pembayaran melalui akun Anda. Terima kasih.",
+            self::STATUS_COMPLETED => "Halo {$this->user->name}, {$sender}. Terima kasih, proses pembelian mobil {$carLabel} ({$this->documentNumber()}) telah SELESAI. Selamat menikmati kendaraan Nissan Anda bersama {$dealerName}!",
+            self::STATUS_REJECTED, self::STATUS_CANCELLED => "Halo {$this->user->name}, {$sender}. Menginformasikan bahwa pengajuan pembelian mobil {$carLabel} ({$this->documentNumber()}) berstatus {$this->statusLabel()}"
+                .(filled($this->admin_note) ? ". Catatan: {$this->admin_note}" : '')
+                .'. Terima kasih.',
+            default => "Halo {$this->user->name}, {$sender}. Menghubungi Anda terkait pengajuan pembelian mobil {$carLabel} dengan No. Pengajuan {$this->documentNumber()} (Status: {$this->statusLabel()}, Pembayaran: {$this->paymentMethodLabel()}). Apakah ada informasi atau berkas yang perlu kami bantu? Terima kasih.",
+        };
 
         return "https://wa.me/{$number}?text=".rawurlencode($text);
     }

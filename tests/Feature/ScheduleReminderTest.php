@@ -150,9 +150,27 @@ class ScheduleReminderTest extends TestCase
             ->assertSee('Ingatkan via WhatsApp')
             ->getContent();
         $this->assertStringContainsString('https://wa.me/6282258098791?text=', $html);
-        $this->assertStringContainsString(rawurlencode('Halo Fadlan, kami dari JAF Dealer mengingatkan jadwal test drive Nissan Kicks e-Power VL'), $html);
+        $this->assertStringContainsString(rawurlencode('Halo Fadlan, kami dari JAF Dealer menginformasikan bahwa jadwal test drive Nissan Kicks e-Power VL'), $html);
+        $this->assertStringContainsString(rawurlencode('telah DIKONFIRMASI'), $html);
 
         $this->get(route('admin.test-drives.show', $done))->assertDontSee('Ingatkan via WhatsApp');
+    }
+
+    public function test_pesan_whatsapp_otomatis_menyesuaikan_status(): void
+    {
+        $pending = $this->makeTestDrive('pending', '2026-10-21');
+        $this->assertStringContainsString(rawurlencode('Status: Menunggu'), (string) $pending->whatsappReminderUrl());
+
+        $cancelled = $this->makeTestDrive('cancelled', '2026-10-21', ['admin_note' => 'Unit sedang perawatan']);
+        $this->assertStringContainsString(rawurlencode('telah DIBATALKAN'), (string) $cancelled->whatsappContactUrl());
+        $this->assertStringContainsString(rawurlencode('Unit sedang perawatan'), (string) $cancelled->whatsappContactUrl());
+
+        $booking = ServiceBooking::factory()->create([
+            'status' => ServiceBooking::STATUS_IN_PROGRESS,
+            'preferred_date' => '2026-10-21',
+            'phone' => '081234567890',
+        ]);
+        $this->assertStringContainsString(rawurlencode('SEDANG DIKERJAKAN'), (string) $booking->whatsappReminderUrl());
     }
 
     public function test_dijadwalkan_setiap_hari_sesuai_jam_konfigurasi(): void

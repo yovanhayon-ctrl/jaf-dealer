@@ -2,6 +2,7 @@
 
 namespace App\Models\Concerns;
 
+use App\Models\ServiceBooking;
 use App\Models\TestDrive;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -64,16 +65,26 @@ trait HasSchedule
             return null;
         }
 
-        $this->loadMissing($this instanceof TestDrive ? ['user', 'car.brand'] : ['user', 'service']);
+        $this->loadMissing($this instanceof TestDrive ? ['user', 'car.brand', 'sales'] : ['user', 'service', 'mechanic']);
         $dealer = config('dealer');
+        $schedule = $this->preferred_date->translatedFormat('l, d M Y')." pukul {$this->timeLabel()} WIB";
+        $location = filled($dealer['address']) ? " di {$dealer['address']}" : '';
         $what = $this instanceof TestDrive
             ? "test drive {$this->car->brand->name} {$this->car->name}"
             : "servis {$this->service->name} untuk {$this->plate_number}";
-        $text = "Halo {$this->user->name}, kami dari {$dealer['name']} mengingatkan jadwal {$what} pada "
-            .$this->preferred_date->translatedFormat('l, d M Y')." pukul {$this->timeLabel()} WIB"
-            .(filled($dealer['address']) ? " di {$dealer['address']}" : '').'.'
-            .($this instanceof TestDrive ? ' Mohon bawa SIM yang masih berlaku.' : ' Mohon datang 15 menit lebih awal.')
-            .' Terima kasih.';
+
+        if ($this->status === ServiceBooking::STATUS_IN_PROGRESS) {
+            $text = "Halo {$this->user->name}, kami dari {$dealer['name']} menginformasikan bahwa {$what} saat ini SEDANG DIKERJAKAN di bengkel kami. Kami akan mengabari kembali setelah selesai. Terima kasih.";
+        } elseif ($this->status === static::STATUS_CONFIRMED) {
+            $assignee = $this instanceof TestDrive
+                ? ($this->sales ? " (Sales pendamping: {$this->sales->name})" : '')
+                : ($this->mechanic ? " (Mekanik: {$this->mechanic->name})" : '');
+            $note = $this instanceof TestDrive ? ' Mohon bawa SIM A yang masih berlaku.' : ' Mohon datang 15 menit lebih awal.';
+            $text = "Halo {$this->user->name}, kami dari {$dealer['name']} menginformasikan bahwa jadwal {$what} pada {$schedule}{$location} telah DIKONFIRMASI{$assignee}.{$note} Terima kasih.";
+        } else {
+            $note = $this instanceof TestDrive ? ' Mohon bawa SIM A yang masih berlaku.' : ' Mohon datang 15 menit lebih awal.';
+            $text = "Halo {$this->user->name}, kami dari {$dealer['name']} mengingatkan jadwal {$what} pada {$schedule}{$location} (Status: {$this->statusLabel()}).{$note} Terima kasih.";
+        }
 
         return "https://wa.me/{$number}?text=".rawurlencode($text);
     }

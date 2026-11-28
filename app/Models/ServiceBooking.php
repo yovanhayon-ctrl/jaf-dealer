@@ -373,13 +373,29 @@ class ServiceBooking extends Model
             return null;
         }
 
-        $this->loadMissing(['user', 'service']);
+        $this->loadMissing(['user', 'service', 'mechanic']);
         $dealerName = (string) config('dealer.name', 'JAF Dealer');
+        $address = (string) config('dealer.address', '');
+        $location = filled($address) ? " di {$address}" : '';
         $sender = $staff?->name ? "saya {$staff->name} dari {$dealerName}" : "kami dari {$dealerName}";
         $scheduleText = $this->preferred_date->translatedFormat('l, d F Y')." pukul {$this->timeLabel()} WIB";
         $serviceName = $this->service?->name ?? 'servis';
         $vehicleLabel = trim("{$this->vehicle_model} ({$this->plate_number})");
-        $text = "Halo {$this->user->name}, {$sender}. Menghubungi Anda terkait booking servis {$serviceName} untuk kendaraan {$vehicleLabel} pada {$scheduleText}. Apakah ada detail atau keluhan tambahan pada kendaraan Anda yang perlu kami persiapkan? Terima kasih.";
+
+        $text = match ($this->status) {
+            self::STATUS_CONFIRMED => "Halo {$this->user->name}, {$sender}. Menginformasikan bahwa booking servis {$serviceName} untuk kendaraan {$vehicleLabel} pada {$scheduleText}{$location} telah DIKONFIRMASI"
+                .($this->mechanic ? " (Mekanik: {$this->mechanic->name})" : '')
+                .'. Mohon datang 15 menit lebih awal. Terima kasih.',
+            self::STATUS_IN_PROGRESS => "Halo {$this->user->name}, {$sender}. Menginformasikan bahwa servis {$serviceName} untuk kendaraan {$vehicleLabel} saat ini SEDANG DIKERJAKAN di bengkel kami"
+                .($this->mechanic ? " oleh {$this->mechanic->name}" : '')
+                .'. Kami akan mengabari kembali setelah selesai. Terima kasih.',
+            self::STATUS_COMPLETED => "Halo {$this->user->name}, {$sender}. Menginformasikan bahwa servis {$serviceName} untuk kendaraan {$vehicleLabel} telah SELESAI dikerjakan. Kendaraan Anda siap diambil. Jangan lupa berikan rating mekanik di akun Anda. Terima kasih.",
+            self::STATUS_CANCELLED => "Halo {$this->user->name}, {$sender}. Menginformasikan bahwa booking servis {$serviceName} untuk kendaraan {$vehicleLabel} pada {$scheduleText} telah DIBATALKAN"
+                .(filled($this->admin_note) ? ". Catatan: {$this->admin_note}" : '')
+                .'. Terima kasih.',
+            self::STATUS_NO_SHOW => "Halo {$this->user->name}, {$sender}. Terkait jadwal servis {$serviceName} untuk kendaraan {$vehicleLabel} pada {$scheduleText} yang belum sempat dihadiri, apakah Anda ingin menjadwalkan ulang? Terima kasih.",
+            default => "Halo {$this->user->name}, {$sender}. Menghubungi Anda terkait booking servis {$serviceName} untuk kendaraan {$vehicleLabel} pada {$scheduleText} (Status: {$this->statusLabel()}). Apakah ada detail atau keluhan tambahan yang perlu kami persiapkan? Terima kasih.",
+        };
 
         return "https://wa.me/{$number}?text=".rawurlencode($text);
     }
