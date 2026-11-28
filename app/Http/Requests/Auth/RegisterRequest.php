@@ -32,12 +32,28 @@ class RegisterRequest extends FormRequest
      */
     public function rules(): array
     {
-        // Di luar environment testing, cek DNS domain email agar domain fiktif (mis. @contoh.com) langsung ditolak.
-        $emailRule = app()->environment('testing') ? 'email' : 'email:rfc,dns';
+        // Di luar environment testing, cek DNS + MX Record agar domain tanpa mail server (mis. @contoh.com) ditolak.
+        $emailRules = [
+            'required',
+            'string',
+            app()->environment('testing') ? 'email' : 'email:rfc,dns',
+            'max:255',
+            'unique:users,email',
+        ];
+
+        if (! app()->environment('testing')) {
+            $emailRules[] = function (string $attribute, mixed $value, \Closure $fail): void {
+                $domain = substr(strrchr((string) $value, '@') ?: '', 1);
+
+                if ($domain === '' || ! checkdnsrr($domain, 'MX')) {
+                    $fail('Domain email tersebut tidak dapat menerima email. Gunakan alamat email yang aktif.');
+                }
+            };
+        }
 
         return [
             'name' => ['required', 'string', 'max:100'],
-            'email' => ['required', 'string', $emailRule, 'max:255', 'unique:users,email'],
+            'email' => $emailRules,
             'phone' => ['required', 'regex:'.self::PHONE_REGEX],
             'password' => ['required', 'confirmed', Password::min(8)],
         ];
