@@ -293,4 +293,32 @@ class CarColorPriceAdjustmentTest extends TestCase
         $response3->assertViewHas('price', 4_690_000_000);
         $response3->assertViewHas('selectedColor', 'Abu-abu Matte Special');
     }
+
+    public function test_halaman_ajukan_pembelian_menampilkan_thumbnail_sesuai_warna_terpilih(): void
+    {
+        $car = $this->createGtr(4_650_000_000);
+        $car->images()->create([
+            'path' => 'cars/gtr-white.webp',
+            'thumb_path' => 'cars/thumbs/gtr-white.webp',
+            'color_name' => 'Putih Mutiara',
+            'is_primary' => true,
+            'sort_order' => 1,
+        ]);
+        $car->images()->create([
+            'path' => 'cars/gtr-jade.webp',
+            'thumb_path' => 'cars/thumbs/gtr-jade.webp',
+            'color_name' => 'Hijau Millennium Jade',
+            'is_primary' => false,
+            'sort_order' => 2,
+        ]);
+
+        $customer = User::factory()->create();
+
+        $this->actingAs($customer)
+            ->get(route('purchase-requests.create', ['car' => $car, 'warna' => 'Hijau Millennium Jade']))
+            ->assertOk()
+            ->assertSee('id="purchaseCarThumb"', false)
+            ->assertSee('cars/thumbs/gtr-jade.webp', false)
+            ->assertSee('data-thumb-url=', false);
+    }
 }

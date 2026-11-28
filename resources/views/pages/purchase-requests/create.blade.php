@@ -27,10 +27,14 @@
                 <h1 class="h3 mb-1">Ajukan Pembelian</h1>
                 <p class="text-muted mb-4">Pilih metode pembayaran dan lengkapi data Anda. Tim kami akan menghubungi lewat WhatsApp untuk proses selanjutnya.</p>
 
+                @php
+                    $activeColorName = old('color', $selectedColor);
+                    $initialImage = ($activeColorName !== '' ? $car->images->firstWhere('color_name', $activeColorName) : null) ?? $car->primaryImage;
+                @endphp
                 <div class="card test-drive-car-summary mb-4">
                     <div class="card-body d-flex align-items-center gap-3 p-3">
-                        @if ($car->primaryImage)
-                            <img src="{{ $car->primaryImage->thumb_url }}" alt="{{ $title }}" class="test-drive-car-thumb">
+                        @if ($initialImage)
+                            <img id="purchaseCarThumb" src="{{ $initialImage->thumb_url }}" alt="{{ $title }}" class="test-drive-car-thumb">
                         @else
                             <span class="test-drive-car-thumb car-card-img-empty" aria-hidden="true"><i class="bi bi-car-front"></i></span>
                         @endif
@@ -92,15 +96,17 @@
                                     <div class="mb-3">
                                         <label for="color" class="form-label fs-6">Pilihan Warna Mobil<span class="text-danger ms-1" aria-hidden="true">*</span></label>
                                         <select id="color" name="color" @class(['form-select', 'is-invalid' => $errors->has('color')]) required>
-                                            <option value="" data-extra-price="0">-- Pilih Warna Mobil --</option>
+                                            <option value="" data-extra-price="0" data-thumb-url="{{ $car->primaryImage?->thumb_url }}">-- Pilih Warna Mobil --</option>
                                             @foreach ($colorSwatches as $swatch)
                                                 @php
                                                     $sStock = (int) ($swatch['stock'] ?? 1);
                                                     $sExtraPrice = (int) ($swatch['extra_price'] ?? 0);
                                                     $isCurrent = (old('color', $selectedColor) === $swatch['name']);
+                                                    $colorThumb = $car->images->firstWhere('color_name', $swatch['name'])?->thumb_url ?? $car->primaryImage?->thumb_url;
                                                 @endphp
                                                 <option value="{{ $swatch['name'] }}"
                                                         data-extra-price="{{ $sExtraPrice }}"
+                                                        data-thumb-url="{{ $colorThumb }}"
                                                         @selected($isCurrent)
                                                         @disabled($sStock <= 0)>
                                                     {{ $swatch['name'] }}

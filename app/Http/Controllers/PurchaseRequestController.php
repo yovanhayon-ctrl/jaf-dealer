@@ -26,7 +26,7 @@ class PurchaseRequestController extends Controller
     {
         abort_unless($car->is_active, 404);
 
-        $car->load(['brand:id,name', 'category:id,name', 'primaryImage:id,car_id,path,thumb_path', 'activePromos:id,car_id,discount_amount']);
+        $car->load(['brand:id,name', 'category:id,name', 'primaryImage:id,car_id,path,thumb_path', 'images:id,car_id,color_name,path,thumb_path', 'activePromos:id,car_id,discount_amount']);
         $user = $request->user();
         $selectedColor = (string) $request->query('warna');
         $price = $car->finalPriceForColor($selectedColor);

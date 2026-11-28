@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var price = BigInt(form.getAttribute('data-price'));
     var colorSelect = form.querySelector('#color');
     var purchasePriceEl = document.getElementById('purchaseCarPrice');
+    var purchaseThumbEl = document.getElementById('purchaseCarThumb');
     var creditFields = form.querySelector('[data-credit-fields]');
     var dpInput = form.querySelector('[data-purchase-dp]');
     var tenorSelect = form.querySelector('[data-purchase-tenor]');
@@ -35,6 +36,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (purchasePriceEl) {
             purchasePriceEl.textContent = rupiah(price);
+        }
+        if (purchaseThumbEl && selectedOpt) {
+            var thumbUrl = selectedOpt.getAttribute('data-thumb-url');
+            if (thumbUrl) {
+                purchaseThumbEl.src = thumbUrl;
+            }
         }
         if (dpInput) {
             var minDp = credit.minDownPayment(price);
