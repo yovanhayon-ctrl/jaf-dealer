@@ -192,9 +192,9 @@ class TestDrive extends Model
         $scheduleText = $this->preferred_date->translatedFormat('l, d F Y')." pukul {$this->timeLabel()} WIB";
 
         $text = match ($this->status) {
-            self::STATUS_CONFIRMED => "Halo {$this->user->name}, {$sender}. Menginformasikan bahwa jadwal test drive mobil {$carLabel} pada {$scheduleText}{$location} telah DIKONFIRMASI"
+            self::STATUS_CONFIRMED => "Halo {$this->user->name}, {$sender}. Menginformasikan bahwa jadwal test drive mobil {$carLabel} pada {$scheduleText} telah DIKONFIRMASI"
                 .($this->sales ? " (Sales pendamping: {$this->sales->name})" : '')
-                .'. Mohon bawa SIM A yang masih berlaku. Terima kasih.',
+                .'. Apakah ada hal yang ingin ditanyakan sebelum jadwal tersebut? Terima kasih.',
             self::STATUS_COMPLETED => "Halo {$this->user->name}, {$sender}. Terima kasih telah mengikuti sesi test drive mobil {$carLabel} bersama {$dealerName}. Jika ada pertanyaan atau ingin melanjutkan proses pembelian, silakan hubungi kami. Terima kasih.",
             self::STATUS_CANCELLED => "Halo {$this->user->name}, {$sender}. Menginformasikan bahwa jadwal test drive mobil {$carLabel} pada {$scheduleText} telah DIBATALKAN"
                 .(filled($this->admin_note) ? ". Catatan: {$this->admin_note}" : '')

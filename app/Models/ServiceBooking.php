@@ -383,9 +383,9 @@ class ServiceBooking extends Model
         $vehicleLabel = trim("{$this->vehicle_model} ({$this->plate_number})");
 
         $text = match ($this->status) {
-            self::STATUS_CONFIRMED => "Halo {$this->user->name}, {$sender}. Menginformasikan bahwa booking servis {$serviceName} untuk kendaraan {$vehicleLabel} pada {$scheduleText}{$location} telah DIKONFIRMASI"
+            self::STATUS_CONFIRMED => "Halo {$this->user->name}, {$sender}. Menginformasikan bahwa booking servis {$serviceName} untuk kendaraan {$vehicleLabel} pada {$scheduleText} telah DIKONFIRMASI"
                 .($this->mechanic ? " (Mekanik: {$this->mechanic->name})" : '')
-                .'. Mohon datang 15 menit lebih awal. Terima kasih.',
+                .'. Apakah ada keluhan atau detail tambahan sebelum kedatangan? Terima kasih.',
             self::STATUS_IN_PROGRESS => "Halo {$this->user->name}, {$sender}. Menginformasikan bahwa servis {$serviceName} untuk kendaraan {$vehicleLabel} saat ini SEDANG DIKERJAKAN di bengkel kami"
                 .($this->mechanic ? " oleh {$this->mechanic->name}" : '')
                 .'. Kami akan mengabari kembali setelah selesai. Terima kasih.',
